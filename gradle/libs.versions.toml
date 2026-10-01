@@ -1,0 +1,18 @@
+[versions]
+spring-boot = "4.1.1"
+mybatis-spring-boot = "4.1.0"
+
+[libraries]
+# BOM: 라이브러리를 끌어오지 않고 버전 제약만 추가한다
+spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+
+# Spring Boot BOM에 없는 서드파티 starter라 버전을 직접 관리한다
+mybatis-spring-boot-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter", version.ref = "mybatis-spring-boot" }
+
+# 테스트: 버전은 Spring Boot BOM이 정한다 (JUnit 6.0.3, AssertJ 3.27.7)
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

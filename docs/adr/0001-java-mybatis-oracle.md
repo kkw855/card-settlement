@@ -16,6 +16,7 @@
 
 - **Java 21** (LTS). record, sealed interface, 가상 스레드를 쓴다.
 - **Spring Boot 4.1**, Spring Batch, MyBatis (Boot 4 호환 starter 버전은 Phase 1에서 확인하고, 호환 문제가 있으면 Boot 3.5로 내린다).
+  - 확인 (2026-10-01): `mybatis-spring-boot-starter` 4.1.0이 Spring Boot 4.1.0 기준으로 빌드되어 있다 → **Boot 4.1 유지.** Boot 4.1 BOM이 관리하는 버전: Spring Batch 6.0, Flyway 12.4, Oracle JDBC 23.26, JUnit 6.0.
 - **Oracle Database 23ai Free** — `gvenzl/oracle-free` 이미지 (Apple Silicon 지원). DB 마이그레이션은 Flyway.
 - 빌드는 Gradle (Kotlin DSL) 멀티모듈.
 
