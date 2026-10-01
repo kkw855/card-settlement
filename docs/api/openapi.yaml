@@ -1,0 +1,473 @@
+openapi: 3.1.0
+info:
+  title: Card Settlement 승인 API
+  version: 0.1.0
+  description: |
+    가맹점이 호출하는 승인·취소·조회 API 계약 (`online-api` 모듈). 설계 이유는 `docs/03-api.md` 참고.
+
+    **성공 판단 규칙**
+    - 카드사까지 간 요청은 거절·타임아웃이어도 `201`(승인) / `200`(취소) 본문의 `status`로 결과를 돌려준다.
+    - 승인은 `status = APPROVED`, 취소는 `status = CANCELLED`일 때만 성공이다.
+    - 4xx는 카드사에 보내기 전에 막힌 요청이다.
+
+servers:
+  - url: http://localhost:8080
+    description: 로컬 (docker compose)
+
+tags:
+  - name: Payment
+    description: Phase 2 — 승인, 취소, 조회
+
+security:
+  - merchantApiKey: []
+
+paths:
+  /v1/payments:
+    post:
+      tags: [Payment]
+      operationId: approvePayment
+      summary: 승인 요청
+      description: |
+        1. 결제를 `REQUESTED`로 먼저 저장한다. `(merchant_id, idempotency_key)` UNIQUE로 중복을 막는다 (I2).
+        2. 카드사에 0100 전문을 보낸다.
+        3. 결과에 따라 상태를 바꾼다.
+           - 0110 정상 → `APPROVED`
+           - 0110 거절, 또는 카드사 연결 실패(전문이 나가지 않음) → `DECLINED`
+           - 응답 확인 실패(타임아웃, 전문 오류) → `UNKNOWN` → 망취소(0420) → `NET_CANCELLED`.
+             망취소 재시도까지 모두 실패하면 `UNKNOWN`으로 응답한다.
+
+        **같은 `Idempotency-Key`로 다시 보내면**
+        - 처음 요청이 아직 처리 중(`REQUESTED`): `409 PAYMENT_IN_PROGRESS`
+        - 처리가 끝남: 저장된 결과로 처음 응답을 재현한다 (`Idempotent-Replayed: true`). 카드사에 다시 보내지 않는다.
+        - 본문이 처음과 다름: `422 IDEMPOTENCY_KEY_REUSED`
+
+        **응답 시간 상한**: 약 27초 (망취소 재시도 최악). 가맹점 클라이언트의 읽기 타임아웃은 30초 이상으로 둔다.
+
+        **시뮬레이터 테스트**: 금액 끝 세 자리로 카드사 응답을 고른다 (`docs/02-message-spec.md` 4장).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApprovalRequest" }
+            examples:
+              lumpSum:
+                summary: 일시불 10,000원 → 승인
+                value: { cardNumber: "4111111111111111", cardExpiry: "2812", installmentMonths: 0, amount: 10000 }
+              installment:
+                summary: 3개월 할부 150,000원 → 승인
+                value: { cardNumber: "4111111111111111", cardExpiry: "2812", installmentMonths: 3, amount: 150000 }
+              limitExceeded:
+                summary: 끝자리 001 → 한도 초과 거절
+                value: { cardNumber: "4111111111111111", cardExpiry: "2812", installmentMonths: 0, amount: 10001 }
+              timeout:
+                summary: 끝자리 009 → 응답 지연 → 망취소
+                value: { cardNumber: "4111111111111111", cardExpiry: "2812", installmentMonths: 0, amount: 10009 }
+      responses:
+        "201":
+          description: 결제가 만들어졌다. **성공 여부는 `status`로 판단한다.**
+          headers:
+            Location:
+              description: "`/v1/payments/{txnId}`"
+              schema: { type: string }
+            Idempotent-Replayed: { $ref: "#/components/headers/IdempotentReplayed" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Payment" }
+              examples:
+                approved:
+                  summary: 승인
+                  value:
+                    txnId: P2026100800000000001
+                    status: APPROVED
+                    amount: 10000
+                    installmentMonths: 0
+                    cardMasked: "411111******1111"
+                    approvalNo: "30012345"
+                    approvedAt: "2026-10-08T10:30:01+09:00"
+                    requestedAt: "2026-10-08T10:30:00+09:00"
+                    result: { code: "0000", message: 정상 }
+                    cancel: null
+                declined:
+                  summary: 카드사 거절 (한도 초과)
+                  value:
+                    txnId: P2026100800000000002
+                    status: DECLINED
+                    amount: 10001
+                    installmentMonths: 0
+                    cardMasked: "411111******1111"
+                    approvalNo: null
+                    approvedAt: null
+                    requestedAt: "2026-10-08T10:31:00+09:00"
+                    result: { code: "1001", message: 한도 초과 }
+                    cancel: null
+                netCancelled:
+                  summary: 응답 지연 → 망취소 완료 (청구되지 않음)
+                  value:
+                    txnId: P2026100800000000003
+                    status: NET_CANCELLED
+                    amount: 10009
+                    installmentMonths: 0
+                    cardMasked: "411111******1111"
+                    approvalNo: null
+                    approvedAt: null
+                    requestedAt: "2026-10-08T10:32:00+09:00"
+                    result: { code: P002, message: "카드사 응답 확인 실패, 망취소 완료" }
+                    cancel: null
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MerchantSuspended" }
+        "409":
+          description: |
+            같은 키의 처음 요청이 아직 처리 중이다 (`PAYMENT_IN_PROGRESS`).
+            응답 시간 상한(27초)을 넘겨서도 계속 `409`면, 처음 요청을 처리하던 서버가 전송 전후에 멈춘 것이다.
+            v1은 이 거래를 다음 날 대사에서 `UNKNOWN`과 같이 다룬다 (`docs/03-api.md` 알려진 한계).
+          headers:
+            Retry-After:
+              description: 다시 시도하기까지 기다릴 초
+              schema: { type: integer, example: 5 }
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: |
+            - `IDEMPOTENCY_KEY_REUSED`: 같은 키에 다른 본문
+            - `INSTALLMENT_NOT_ALLOWED`: 5만 원 미만 할부
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /v1/payments/{txnId}:
+    get:
+      tags: [Payment]
+      operationId: getPayment
+      summary: 결제 조회
+      description: 다른 가맹점의 거래는 존재 여부를 숨기려고 `404`로 응답한다.
+      parameters:
+        - $ref: "#/components/parameters/TxnId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Payment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/PaymentNotFound" }
+
+  /v1/payments/{txnId}/cancel:
+    post:
+      tags: [Payment]
+      operationId: cancelPayment
+      summary: 전체 취소
+      description: |
+        결제 하나에 대한 동작이라 `txnId`가 멱등 키 역할을 한다. `Idempotency-Key`는 받지 않는다.
+
+        1. 결제가 `APPROVED`인지 확인한다. 이미 `CANCELLED`면 카드사에 보내지 않고 그 결과를 `200`으로 돌려준다.
+        2. 취소를 `REQUESTED`로 저장하고 0400 전문을 보낸다.
+           결제당 결과를 기다리거나 성공한 취소는 하나만 있을 수 있다 (`docs/01-erd.md` 함수 기반 유니크 인덱스).
+        3. 결과에 따라 상태를 바꾼다.
+           - 0410 정상, 또는 `2002 이미 취소됨` → 취소 `CANCELLED`, 결제 `CANCELLED`
+           - 0410 거절, 또는 연결 실패 → 취소 `FAILED`, 결제는 `APPROVED` 그대로
+           - 응답 확인 실패 → 취소 `UNKNOWN` → 망취소(0420, 원전문구분코드 `0400`) → 취소 `NET_CANCELLED`, 결제는 `APPROVED` 그대로
+
+        취소가 `FAILED`나 `NET_CANCELLED`로 끝나면 같은 결제를 다시 취소할 수 있다.
+      parameters:
+        - $ref: "#/components/parameters/TxnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CancelRequest" }
+            example: { amount: 10000 }
+      responses:
+        "200":
+          description: 카드사까지 간 취소의 결과. **성공 여부는 `status = CANCELLED`로 판단한다.**
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Payment" }
+              examples:
+                cancelled:
+                  summary: 취소 성공
+                  value:
+                    txnId: P2026100800000000001
+                    status: CANCELLED
+                    amount: 10000
+                    installmentMonths: 0
+                    cardMasked: "411111******1111"
+                    approvalNo: "30012345"
+                    approvedAt: "2026-10-08T10:30:01+09:00"
+                    requestedAt: "2026-10-08T10:30:00+09:00"
+                    result: { code: "0000", message: 정상 }
+                    cancel:
+                      cancelTxnId: P2026100800000000010
+                      status: CANCELLED
+                      amount: 10000
+                      approvalNo: "30012399"
+                      cancelledAt: "2026-10-08T15:00:02+09:00"
+                      result: { code: "0000", message: 정상 }
+                cancelNetCancelled:
+                  summary: 취소 응답 지연 → 취소를 망취소 (결제는 승인 상태 유지, 다시 취소 가능)
+                  value:
+                    txnId: P2026100800000000001
+                    status: APPROVED
+                    amount: 10000
+                    installmentMonths: 0
+                    cardMasked: "411111******1111"
+                    approvalNo: "30012345"
+                    approvedAt: "2026-10-08T10:30:01+09:00"
+                    requestedAt: "2026-10-08T10:30:00+09:00"
+                    result: { code: "0000", message: 정상 }
+                    cancel:
+                      cancelTxnId: P2026100800000000010
+                      status: NET_CANCELLED
+                      amount: 10000
+                      approvalNo: null
+                      cancelledAt: null
+                      result: { code: P002, message: "카드사 응답 확인 실패, 망취소 완료" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MerchantSuspended" }
+        "404": { $ref: "#/components/responses/PaymentNotFound" }
+        "409":
+          description: |
+            - `NOT_CANCELLABLE`: 결제가 `APPROVED`가 아니다 (`DECLINED`, `NET_CANCELLED`, `UNKNOWN`, `REQUESTED`). `currentStatus`에 현재 상태가 온다.
+            - `CANCEL_PENDING`: 결과를 모르는 이전 취소가 있다 (처리 중이거나 망취소까지 실패). 미확정 취소는 운영자가 카드사와 확인한다.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: "`CANCEL_AMOUNT_MISMATCH`: v1은 전체 취소만 지원하므로 취소 금액이 결제 금액과 같아야 한다."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+components:
+  securitySchemes:
+    merchantApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: |
+        가맹점별 API 키. 서버는 SHA-256 해시(`merchant.api_key_hash`)만 저장한다.
+        가맹점은 키로 식별하므로 본문에 가맹점번호를 받지 않는다. v1은 발급 API 없이 시드 데이터로 넣는다.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        가맹점이 요청마다 새로 만드는 키 (UUID v4 권장). 타임아웃 후 **같은 결제를 다시 시도할 때만** 같은 키를 쓴다.
+        거절된 결제를 다시 시도하려면 새 키를 써야 한다 (같은 키는 거절 결과를 재현한다).
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: "^[\\x21-\\x7E]+$"
+        example: 8e03978e-40d5-43e8-bc93-6894a57f9324
+    TxnId:
+      name: txnId
+      in: path
+      required: true
+      description: 거래고유번호 (`P` + 날짜 8자리 + 일련번호 11자리)
+      schema: { $ref: "#/components/schemas/TxnId" }
+
+  headers:
+    IdempotentReplayed:
+      description: 같은 키의 이전 결과를 재현한 응답이면 `true`. 새로 처리한 응답에는 이 헤더가 없다.
+      schema: { type: boolean }
+
+  responses:
+    BadRequest:
+      description: |
+        - `VALIDATION_FAILED`: 형식 오류. `errors`에 필드와 이유만 담고 **입력값은 담지 않는다** (I10).
+        - `IDEMPOTENCY_KEY_REQUIRED`: 승인 요청에 `Idempotency-Key`가 없다.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            code: VALIDATION_FAILED
+            errors:
+              - { field: cardNumber, reason: 숫자 16자리여야 한다 }
+    Unauthorized:
+      description: "`UNAUTHORIZED`: API 키가 없거나 틀렸다."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    MerchantSuspended:
+      description: "`MERCHANT_SUSPENDED`: 가맹점 상태가 `SUSPENDED`다."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PaymentNotFound:
+      description: "`PAYMENT_NOT_FOUND`: 거래가 없거나 다른 가맹점의 거래다."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    TxnId:
+      type: string
+      pattern: "^P\\d{19}$"
+      example: P2026100800000000001
+
+    ApprovalRequest:
+      type: object
+      required: [cardNumber, cardExpiry, installmentMonths, amount]
+      properties:
+        cardNumber:
+          type: string
+          pattern: "^\\d{16}$"
+          writeOnly: true
+          description: |
+            카드번호 16자리. **테스트 카드번호만 쓴다.** 로그와 에러 응답에 남기지 않는다 (I10).
+            형식만 검사하고 Luhn 검증은 카드사(시뮬레이터)가 한다 (실패 시 `1003`).
+          example: "4111111111111111"
+        cardExpiry:
+          type: string
+          pattern: "^\\d{2}(0[1-9]|1[0-2])$"
+          writeOnly: true
+          description: 유효기간 `yyMM`. 저장하지 않는다. 만료 여부는 카드사가 판단한다 (`1002`).
+          example: "2812"
+        installmentMonths:
+          type: integer
+          minimum: 0
+          maximum: 36
+          not: { const: 1 }
+          description: "`0` = 일시불, `2`~`36` = 할부 개월. `1`은 없다. 할부는 50,000원 이상만 가능하다."
+          example: 0
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 999999999999
+          description: 결제 금액 (원). 상한은 전문 거래금액 필드 12자리.
+          example: 10000
+
+    CancelRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 취소 금액 (원). v1은 결제 금액과 같아야 한다.
+
+    PaymentStatus:
+      type: string
+      enum: [REQUESTED, APPROVED, DECLINED, UNKNOWN, NET_CANCELLED, CANCELLED]
+      description: |
+        `docs/00-domain.md` 4장의 상태 그대로다.
+        - `APPROVED`: 승인. 가맹점은 이때만 상품을 내준다.
+        - `DECLINED`: 거절 (카드사 거절 또는 카드사 연결 실패)
+        - `NET_CANCELLED`: 결과를 몰라서 망취소로 무효화했다. 청구되지 않는다.
+        - `UNKNOWN`: 망취소까지 실패해 결과가 확정되지 않았다. **실패로 취급한다.** 다음 날 대사에서 확인한다.
+        - `REQUESTED`: 처리 중 (조회에서만 보인다)
+        - `CANCELLED`: 승인 후 취소됨
+
+    CancelStatus:
+      type: string
+      enum: [REQUESTED, CANCELLED, FAILED, UNKNOWN, NET_CANCELLED]
+
+    Result:
+      type: object
+      required: [code, message]
+      description: |
+        마지막으로 받은 결과. 카드사 응답코드(숫자 4자리)이거나, 카드사 응답이 없을 때 PG가 붙이는 내부 코드(`P` + 숫자 3자리)다.
+        코드 표는 `docs/03-api.md`.
+      properties:
+        code: { type: string, pattern: "^(\\d{4}|P\\d{3})$", example: "0000" }
+        message: { type: string, example: 정상 }
+
+    Cancel:
+      type: object
+      required: [cancelTxnId, status, amount]
+      description: 가장 최근의 취소 시도
+      properties:
+        cancelTxnId: { $ref: "#/components/schemas/TxnId" }
+        status: { $ref: "#/components/schemas/CancelStatus" }
+        amount: { type: integer, format: int64 }
+        approvalNo: { type: [string, "null"], maxLength: 8 }
+        cancelledAt: { type: [string, "null"], format: date-time }
+        result:
+          oneOf:
+            - $ref: "#/components/schemas/Result"
+            - type: "null"
+
+    Payment:
+      type: object
+      required: [txnId, status, amount, installmentMonths, cardMasked, requestedAt]
+      properties:
+        txnId: { $ref: "#/components/schemas/TxnId" }
+        status: { $ref: "#/components/schemas/PaymentStatus" }
+        amount: { type: integer, format: int64 }
+        installmentMonths: { type: integer }
+        cardMasked:
+          type: string
+          pattern: "^\\d{6}\\*{6}\\d{4}$"
+          example: "411111******1111"
+        approvalNo:
+          type: [string, "null"]
+          maxLength: 8
+          description: 카드사 승인번호. 승인되지 않았으면 `null`.
+        approvedAt:
+          type: [string, "null"]
+          format: date-time
+          description: KST (`+09:00`)
+        requestedAt:
+          type: string
+          format: date-time
+        result:
+          description: "`REQUESTED`면 `null`"
+          oneOf:
+            - $ref: "#/components/schemas/Result"
+            - type: "null"
+        cancel:
+          oneOf:
+            - $ref: "#/components/schemas/Cancel"
+            - type: "null"
+
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - UNAUTHORIZED
+        - MERCHANT_SUSPENDED
+        - PAYMENT_NOT_FOUND
+        - PAYMENT_IN_PROGRESS
+        - NOT_CANCELLABLE
+        - CANCEL_PENDING
+        - IDEMPOTENCY_KEY_REUSED
+        - INSTALLMENT_NOT_ALLOWED
+        - CANCEL_AMOUNT_MISMATCH
+        - INTERNAL_ERROR
+
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details + 가맹점이 분기할 `code`
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, default: about:blank }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { $ref: "#/components/schemas/ErrorCode" }
+        currentStatus:
+          $ref: "#/components/schemas/PaymentStatus"
+          description: "`NOT_CANCELLABLE`일 때 결제의 현재 상태"
+        errors:
+          type: array
+          description: "`VALIDATION_FAILED`일 때만. 입력값(rejected value)은 담지 않는다."
+          items:
+            type: object
+            required: [field, reason]
+            properties:
+              field: { type: string }
+              reason: { type: string }
