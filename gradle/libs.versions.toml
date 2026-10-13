@@ -14,5 +14,12 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core" }
 
+# DB: 버전은 Spring Boot BOM이 정한다 (Flyway 12.4, Oracle JDBC 23.26.3, Testcontainers 2.0.5)
+flyway-core = { module = "org.flywaydb:flyway-core" }
+flyway-database-oracle = { module = "org.flywaydb:flyway-database-oracle" }
+ojdbc17 = { module = "com.oracle.database.jdbc:ojdbc17" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+testcontainers-oracle-free = { module = "org.testcontainers:testcontainers-oracle-free" }
+
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

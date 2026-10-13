@@ -82,6 +82,7 @@ erDiagram
         NUMBER capture_sum
         NUMBER cancel_sum
         VARCHAR2 status "LOADING | LOADED | REJECTED"
+        VARCHAR2 reject_reason "REJECTED일 때 필수"
         TIMESTAMP loaded_at
     }
     acquisition_record {
@@ -137,6 +138,8 @@ erDiagram
     }
 ```
 
+제약 조건(이름 포함)과 인덱스의 전체 목록은 `core/src/main/resources/db/migration/V1__create_tables.sql`이 원본이다. 마이그레이션 위치와 실행 주체는 [ADR-0006](adr/0006-schema-migration.md).
+
 Spring Batch 메타데이터 테이블(`BATCH_*`)은 Spring Batch가 제공하는 Oracle용 스크립트를 Flyway 마이그레이션으로 관리한다.
 
 ## 설계 메모
@@ -167,6 +170,8 @@ CREATE UNIQUE INDEX uk_payment_cancel_active ON payment_cancel (
 ```
 
 `FAILED`, `NET_CANCELLED` 행은 식의 값이 NULL이라 인덱스에 없고, 나머지 상태만 결제당 하나로 제한된다. 동시에 두 취소 요청이 들어오면 두 번째 INSERT가 ORA-00001로 막힌다.
+
+**거부된 매입 파일** — 헤더나 트레일러를 읽지 못해 거부될 수 있으므로, `REJECTED`인 행은 건수·합계가 비어 있어도 된다. 대신 `reject_reason`이 있어야 한다 (CHECK 제약).
 
 **매입 레코드 순번** — `record_seq`는 파일 안에서 몇 번째 데이터 레코드인지다. 적재 배치가 재시작될 때 같은 레코드를 두 번 넣는 버그가 있어도 `UK(file_id, record_seq)`가 막는다 ([04-batch.md](04-batch.md)).
 
