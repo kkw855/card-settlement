@@ -11,7 +11,7 @@
 - `docs/adr/` — 설계 결정. 결정을 바꾸면 새 ADR을 추가하고 기존 ADR 상태를 갱신한다.
 
 ## 스택
-- Java 21, Spring Boot 4.1, Spring Batch, MyBatis, Oracle 23ai Free, Flyway, Gradle(Kotlin DSL) 멀티모듈.
+- Java 21, Spring Boot 4.1, Spring Batch, MyBatis, Oracle AI Database 26ai Free (버전 23.26), Flyway, Gradle(Kotlin DSL) 멀티모듈.
 - 모듈: `codec`, `core`, `online-api`, `batch`, `simulator` (ADR-0002).
 - 실행: 로컬 docker compose (Oracle). 홈랩에 의존하지 않는다.
 

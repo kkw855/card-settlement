@@ -1,0 +1,25 @@
+name: card-settlement
+
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    ports:
+      # 127.0.0.1에만 연다. "1521:1521"로 쓰면 같은 네트워크의 다른 기기에서도 접속할 수 있다.
+      - "127.0.0.1:1521:1521"
+    environment:
+      ORACLE_PASSWORD: "${ORACLE_PASSWORD:?.env에 ORACLE_PASSWORD를 설정하세요}"
+      APP_USER: "${APP_USER:?.env에 APP_USER를 설정하세요}"
+      APP_USER_PASSWORD: "${APP_USER_PASSWORD:?.env에 APP_USER_PASSWORD를 설정하세요}"
+      # DB 서버 시계를 KST로 맞춘다. 없으면 UTC라 SYSTIMESTAMP가 9시간 어긋난다.
+      TZ: Asia/Seoul
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  oracle-data:

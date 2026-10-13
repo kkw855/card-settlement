@@ -170,4 +170,6 @@ CREATE UNIQUE INDEX uk_payment_cancel_active ON payment_cancel (
 
 **매입 레코드 순번** — `record_seq`는 파일 안에서 몇 번째 데이터 레코드인지다. 적재 배치가 재시작될 때 같은 레코드를 두 번 넣는 버그가 있어도 `UK(file_id, record_seq)`가 막는다 ([04-batch.md](04-batch.md)).
 
+**문자열 길이는 `CHAR` 단위로** — DB 문자셋은 AL32UTF8이고, `VARCHAR2(n)`의 기본 단위는 **바이트**다. 한글 1자가 3바이트라 `VARCHAR2(10)`에 "홍길동카페"(15바이트)를 넣으면 ORA-12899가 난다 (2026-10-13 확인). 전문의 MS949 길이(40바이트 = 한글 20자)와 DB 길이는 단위가 다르므로, 한글이 들어가는 컬럼은 `VARCHAR2(n CHAR)`로 선언한다.
+
 **시간** — 모든 시각은 KST로 저장한다 (`TIMESTAMP`). 날짜 의미만 있는 값(매입일, 지급일, 수수료율 기간)은 `DATE`의 시분초를 0으로 둔다.
