@@ -23,7 +23,7 @@ class CardCompanyTest {
   @Test
   @DisplayName("C1 정상 승인: 0000, 승인번호 발급, 기록에는 마스킹한 카드번호")
   void approves() {
-    CardCompany.Reply reply = cardCompany.handle(Requests.approval("P2026100800000000001", 10_000));
+    CardCompany.Reply.Respond reply = respond(cardCompany.handle(Requests.approval("P2026100800000000001", 10_000)));
     MessageReader response = RESPONSE_0110.reader(reply.body());
 
     assertThat(response.getDigits(MSG_TYPE)).isEqualTo("0110");
@@ -39,7 +39,7 @@ class CardCompanyTest {
   @Test
   @DisplayName("C2 끝자리 001: 한도 초과로 거절, 승인번호 없음, 기록 없음")
   void declinesLimitExceeded() {
-    CardCompany.Reply reply = cardCompany.handle(Requests.approval("P2026100800000000002", 10_001));
+    CardCompany.Reply.Respond reply = respond(cardCompany.handle(Requests.approval("P2026100800000000002", 10_001)));
     MessageReader response = RESPONSE_0110.reader(reply.body());
 
     assertThat(response.getText(RESPONSE_CODE)).isEqualTo("1001");
@@ -68,7 +68,7 @@ class CardCompanyTest {
   @Test
   @DisplayName("C5 끝자리 009: 카드사는 승인하고 기록까지 남기지만 응답을 늦게 보낸다")
   void approveButDelayResponse() {
-    CardCompany.Reply reply = cardCompany.handle(Requests.approval("P2026100800000000006", 10_009));
+    CardCompany.Reply.Respond reply = respond(cardCompany.handle(Requests.approval("P2026100800000000006", 10_009)));
 
     assertThat(responseCode(reply)).isEqualTo("0000");
     assertThat(reply.delay()).isEqualTo(DELAY);
@@ -76,6 +76,13 @@ class CardCompanyTest {
   }
 
   private String responseCode(CardCompany.Reply reply) {
-    return RESPONSE_0110.reader(reply.body()).getText(RESPONSE_CODE);
+    return RESPONSE_0110.reader(respond(reply).body()).getText(RESPONSE_CODE);
+  }
+
+  static CardCompany.Reply.Respond respond(CardCompany.Reply reply) {
+    if (reply instanceof CardCompany.Reply.Respond respond) {
+      return respond;
+    }
+    throw new AssertionError("응답을 보내야 하는데 보내지 않는다: " + reply);
   }
 }

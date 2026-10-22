@@ -2,7 +2,7 @@ package io.github.kkw855.settlement.simulator;
 
 /** 카드사 응답코드 (docs/02-message-spec.md 2장). */
 enum ResponseCode {
-  APPROVED("0000", "정상"),
+  OK("0000", "정상"),
   LIMIT_EXCEEDED("1001", "한도 초과"),
   INVALID_EXPIRY("1002", "유효기간 오류"),
   INVALID_CARD("1003", "카드번호 오류"),

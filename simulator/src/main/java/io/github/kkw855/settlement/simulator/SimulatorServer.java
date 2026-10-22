@@ -9,6 +9,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -62,17 +63,25 @@ final class SimulatorServer implements AutoCloseable {
     try (socket) {
       socket.setSoTimeout(IDLE_TIMEOUT_MILLIS);
       byte[] request = Framing.read(socket.getInputStream(), MessageLayouts.MESSAGE_LENGTH);
-      CardCompany.Reply reply = cardCompany.handle(request);
-      if (!reply.delay().isZero()) {
-        Thread.sleep(reply.delay());
+      switch (cardCompany.handle(request)) {
+        case CardCompany.Reply.Respond(byte[] body, Duration delay) -> {
+          sleep(delay);
+          Framing.write(socket.getOutputStream(), body);
+        }
+        case CardCompany.Reply.Silent(Duration duration) -> sleep(duration); // 응답 없이 기다렸다가 닫는다
       }
-      Framing.write(socket.getOutputStream(), reply.body());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException | RuntimeException e) {
       // 지연 시나리오에서는 PG가 먼저 타임아웃으로 연결을 끊어서 쓰기가 실패한다. 정상이다.
       // 카드번호가 들어 있을 수 있으므로 전문 내용은 남기지 않는다.
       log.log(Level.INFO, () -> "연결 처리 종료: " + e);
+    }
+  }
+
+  private static void sleep(Duration duration) throws InterruptedException {
+    if (!duration.isZero()) {
+      Thread.sleep(duration);
     }
   }
 

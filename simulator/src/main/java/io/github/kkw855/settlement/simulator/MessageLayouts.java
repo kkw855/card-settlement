@@ -27,11 +27,30 @@ final class MessageLayouts {
   static final Field.AN MERCHANT_NAME = new Field.AN("가맹점명", 94, 40);
   static final Field.AN REQUEST_RESERVED = new Field.AN("0100 예비", 134, 16);
 
-  // 0110 승인 응답 개별부
+  // 0110 승인 응답 · 0410 취소 응답 개별부 (두 응답의 모양이 같다)
   static final Field.AN APPROVAL_NO = new Field.AN("승인번호", 50, 8);
   static final Field.N APPROVED_AT = new Field.N("승인일시", 58, 14);
   static final Field.AN RESPONSE_MESSAGE = new Field.AN("응답메시지", 72, 40);
-  static final Field.AN RESPONSE_RESERVED = new Field.AN("0110 예비", 112, 38);
+  static final Field.AN RESPONSE_RESERVED = new Field.AN("응답 예비", 112, 38);
+
+  // 0400 취소 요청 개별부
+  static final Field.AN ORIGINAL_TXN_ID = new Field.AN("원거래고유번호", 50, 20); // 0420·0430도 같은 자리
+
+  static final Field.AN ORIGINAL_APPROVAL_NO = new Field.AN("원승인번호", 70, 8);
+  static final Field.N ORIGINAL_APPROVED_DATE = new Field.N("원승인일자", 78, 8);
+  static final Field.AN CANCEL_MERCHANT_NO = new Field.AN("가맹점번호", 86, 10);
+  static final Field.N CANCEL_AMOUNT = new Field.N("취소금액", 96, 12);
+  static final Field.AN CANCEL_RESERVED = new Field.AN("0400 예비", 108, 42);
+
+  // 0420 망취소 요청 개별부
+  static final Field.N ORIGINAL_MSG_TYPE = new Field.N("원전문구분코드", 70, 4);
+  static final Field.AN NET_CANCEL_MERCHANT_NO = new Field.AN("가맹점번호", 74, 10);
+  static final Field.N NET_CANCEL_AMOUNT = new Field.N("거래금액", 84, 12);
+  static final Field.AN NET_CANCEL_RESERVED = new Field.AN("0420 예비", 96, 54);
+
+  // 0430 망취소 응답 개별부
+  static final Field.AN NET_CANCEL_RESULT = new Field.AN("처리구분", 70, 2);
+  static final Field.AN NET_CANCEL_RESPONSE_RESERVED = new Field.AN("0430 예비", 72, 78);
 
   static final int MESSAGE_LENGTH = 150;
 
@@ -42,6 +61,22 @@ final class MessageLayouts {
   static final Layout RESPONSE_0110 = Layout.of("0110", MESSAGE_LENGTH,
     MSG_TYPE, TXN_ID, SENT_AT, RESPONSE_CODE, HEADER_RESERVED,
     APPROVAL_NO, APPROVED_AT, RESPONSE_MESSAGE, RESPONSE_RESERVED);
+
+  static final Layout REQUEST_0400 = Layout.of("0400", MESSAGE_LENGTH,
+    MSG_TYPE, TXN_ID, SENT_AT, RESPONSE_CODE, HEADER_RESERVED,
+    ORIGINAL_TXN_ID, ORIGINAL_APPROVAL_NO, ORIGINAL_APPROVED_DATE, CANCEL_MERCHANT_NO, CANCEL_AMOUNT, CANCEL_RESERVED);
+
+  static final Layout RESPONSE_0410 = Layout.of("0410", MESSAGE_LENGTH,
+    MSG_TYPE, TXN_ID, SENT_AT, RESPONSE_CODE, HEADER_RESERVED,
+    APPROVAL_NO, APPROVED_AT, RESPONSE_MESSAGE, RESPONSE_RESERVED);
+
+  static final Layout REQUEST_0420 = Layout.of("0420", MESSAGE_LENGTH,
+    MSG_TYPE, TXN_ID, SENT_AT, RESPONSE_CODE, HEADER_RESERVED,
+    ORIGINAL_TXN_ID, ORIGINAL_MSG_TYPE, NET_CANCEL_MERCHANT_NO, NET_CANCEL_AMOUNT, NET_CANCEL_RESERVED);
+
+  static final Layout RESPONSE_0430 = Layout.of("0430", MESSAGE_LENGTH,
+    MSG_TYPE, TXN_ID, SENT_AT, RESPONSE_CODE, HEADER_RESERVED,
+    ORIGINAL_TXN_ID, NET_CANCEL_RESULT, NET_CANCEL_RESPONSE_RESERVED);
 
   private MessageLayouts() {}
 }

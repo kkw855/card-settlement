@@ -24,4 +24,30 @@ final class Requests {
   static byte[] approval(String txnId, long amount) {
     return approval(txnId, "4111111111111111", "2812", amount);
   }
+
+  static byte[] cancel(String cancelTxnId, String originalTxnId, String approvalNo, String approvedDate, long amount) {
+    return REQUEST_0400.writer()
+      .set(MSG_TYPE, "0400")
+      .set(TXN_ID, cancelTxnId)
+      .set(SENT_AT, "20261008150000")
+      .set(ORIGINAL_TXN_ID, originalTxnId)
+      .set(ORIGINAL_APPROVAL_NO, approvalNo)
+      .set(ORIGINAL_APPROVED_DATE, approvedDate)
+      .set(CANCEL_MERCHANT_NO, "M000000001")
+      .set(CANCEL_AMOUNT, amount)
+      .toBytes();
+  }
+
+  /** 망취소의 공통부 거래고유번호는 원거래고유번호와 같다 (docs/02-message-spec.md 3장) */
+  static byte[] netCancel(String originalTxnId, String originalMsgType, long amount) {
+    return REQUEST_0420.writer()
+      .set(MSG_TYPE, "0420")
+      .set(TXN_ID, originalTxnId)
+      .set(SENT_AT, "20261008103004")
+      .set(ORIGINAL_TXN_ID, originalTxnId)
+      .set(ORIGINAL_MSG_TYPE, originalMsgType)
+      .set(NET_CANCEL_MERCHANT_NO, "M000000001")
+      .set(NET_CANCEL_AMOUNT, amount)
+      .toBytes();
+  }
 }

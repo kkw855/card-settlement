@@ -74,6 +74,15 @@ class SimulatorServerTest {
     }
   }
 
+  @Test
+  @DisplayName("S4 끝자리 119의 망취소: 서버가 아무것도 보내지 않아 클라이언트는 타임아웃이 난다")
+  void silentNetCancel() throws IOException {
+    send(Requests.approval("P2026100800000000003", 10_119), 1_000); // 응답이 500ms 늦지만 1초 안에 온다
+
+    assertThatThrownBy(() -> send(Requests.netCancel("P2026100800000000003", "0100", 10_119), 200))
+      .isInstanceOf(SocketTimeoutException.class);
+  }
+
   /** 거래마다 연결: 연결 -> 요청 -> 응답 -> 닫기. */
   private byte[] send(byte[] request, int readTimeoutMillis) throws IOException {
     try (Socket socket = new Socket("localhost", server.port())) {
