@@ -6,6 +6,12 @@ mybatis-spring-boot = "4.1.0"
 # BOM: 라이브러리를 끌어오지 않고 버전 제약만 추가한다
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 
+# Spring Boot starter: 버전은 BOM이 정한다
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+
 # Spring Boot BOM에 없는 서드파티 starter라 버전을 직접 관리한다
 mybatis-spring-boot-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter", version.ref = "mybatis-spring-boot" }
 
