@@ -22,9 +22,9 @@ class OnlineApiApplicationTest extends IntegrationTest {
   CardProtector cardProtector;
 
   @Test
-  @DisplayName("A1 앱이 뜨면서 Flyway가 V1을 적용한다")
+  @DisplayName("A1 앱이 뜨면서 Flyway가 V1, V2를 적용한다")
   void appliesMigrationOnStartup() {
-    assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+    assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM user_tables WHERE table_name = 'PAYMENT'", Integer.class))
       .isEqualTo(1);
   }

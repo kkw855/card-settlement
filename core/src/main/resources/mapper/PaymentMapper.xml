@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.kkw855.settlement.core.payment.PaymentMapper">
+
+  <sql id="columns">
+    payment_id, txn_id, merchant_id, idempotency_key, card_enc, card_hash, card_masked,
+    installment_months, amount, status, result_code, approval_no, approved_at, requested_at, version
+  </sql>
+
+  <!-- flushCache: MyBatis는 같은 세션(트랜잭션) 안의 같은 SELECT 결과를 캐시해서 돌려준다.
+       NEXTVAL은 부를 때마다 달라야 하므로 캐시를 비우고 매번 DB에 묻는다 -->
+  <select id="nextTxnSequence" resultType="long" flushCache="true" useCache="false">
+    SELECT txn_id_seq.NEXTVAL FROM dual
+  </select>
+
+  <!-- 결과 컬럼(result_code, approval_no, approved_at)은 아직 없으므로 넣지 않는다 -->
+  <insert id="insert">
+    INSERT INTO payment (txn_id, merchant_id, idempotency_key, card_enc, card_hash, card_masked,
+    installment_months, amount, status, requested_at)
+    VALUES (#{txnId}, #{merchantId}, #{idempotencyKey}, #{cardEnc}, #{cardHash}, #{cardMasked},
+    #{installmentMonths}, #{amount}, #{status}, #{requestedAt})
+  </insert>
+
+  <select id="findByTxnId" resultType="io.github.kkw855.settlement.core.payment.Payment">
+    SELECT <include refid="columns"/>
+    FROM payment
+    WHERE txn_id = #{txnId}
+  </select>
+
+  <select id="findByIdempotencyKey" resultType="io.github.kkw855.settlement.core.payment.Payment">
+    SELECT <include refid="columns"/>
+    FROM payment
+    WHERE merchant_id = #{merchantId} AND idempotency_key = #{idempotencyKey}
+  </select>
+
+  <!-- 상태 조건을 WHERE에 넣는다. 이미 다른 상태로 바뀌었으면 0행이 바뀌고, 호출한 쪽이 그걸 보고 판단한다 (I3) -->
+  <update id="approve">
+    UPDATE payment
+    SET status = 'APPROVED',
+        result_code = #{resultCode},
+        approval_no = #{approvalNo},
+        approved_at = #{approvedAt},
+        version = version + 1
+    WHERE txn_id = #{txnId} AND status = 'REQUESTED'
+  </update>
+
+  <update id="changeStatus">
+    UPDATE payment
+    SET status = #{next},
+        result_code = #{resultCode},
+        version = version + 1
+    WHERE txn_id = #{txnId} AND status = #{expected}
+  </update>
+
+</mapper>

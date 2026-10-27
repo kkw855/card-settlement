@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.kkw855.settlement.core.merchant.MerchantMapper">
+
+  <sql id="columns">
+    merchant_id, merchant_no, name, settlement_cycle_days, payout_bank_code,
+    payout_account_enc, payout_account_masked, holder_name, status, api_key_hash
+  </sql>
+
+  <insert id="insert">
+    INSERT INTO merchant (merchant_no, name, settlement_cycle_days, payout_bank_code,
+    payout_account_enc, payout_account_masked, holder_name, status, api_key_hash)
+    VALUES (#{merchantNo}, #{name}, #{settlementCycleDays}, #{payoutBankCode},
+    #{payoutAccountEnc}, #{payoutAccountMasked}, #{holderName}, #{status}, #{apiKeyHash})
+  </insert>
+
+  <select id="findByApiKeyHash" resultType="io.github.kkw855.settlement.core.merchant.Merchant">
+    SELECT <include refid="columns"/> FROM merchant WHERE api_key_hash = #{apiKeyHash}
+  </select>
+
+  <select id="findByMerchantNo" resultType="io.github.kkw855.settlement.core.merchant.Merchant">
+    SELECT <include refid="columns"/> FROM merchant WHERE merchant_no = #{merchantNo}
+  </select>
+
+</mapper>

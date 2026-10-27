@@ -25,5 +25,8 @@ crypto:
   card-hmac-key: ${CARD_HMAC_KEY:}
 
 mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml # core jar 안에 있으므로 classpath*로 모든 jar를 찾는다
   configuration:
     map-underscore-to-camel-case: true
+    arg-name-based-constructor-auto-mapping: true # record 생성자 인자를 순서가 아니라 이름으로 컬럼에 맞춘다
+    jdbc-type-for-null: 'NULL' # Oracle은 타입 없는 null 파라미터를 받지 않는다 (ORA-17004)

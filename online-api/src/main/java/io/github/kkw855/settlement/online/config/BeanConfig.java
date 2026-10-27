@@ -4,9 +4,14 @@ import io.github.kkw855.settlement.core.card.CardProtector;
 import io.github.kkw855.settlement.core.crypto.AesGcmEncryptor;
 import io.github.kkw855.settlement.core.crypto.CryptoKeys;
 import io.github.kkw855.settlement.core.crypto.HmacHasher;
+import io.github.kkw855.settlement.core.payment.PaymentMapper;
+import io.github.kkw855.settlement.core.payment.TxnIdGenerator;
 import io.github.kkw855.settlement.online.card.CardCompanyClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.time.Clock;
+import java.time.ZoneId;
 
 /**
  * Spring을 모르는 클래스(core, online.card)를 빈으로 등록한다.
@@ -31,5 +36,16 @@ class BeanConfig {
       new AesGcmEncryptor(CryptoKeys.aes(properties.cardEncryptionKey())),
       new HmacHasher(CryptoKeys.hmac(properties.cardHmacKey()))
     );
+  }
+
+  /** 모든 시각은 KST로 다룬다 (docs/01-erd.md). 테스트에서는 고정 시계로 바꿀 수 있다. */
+  @Bean
+  Clock clock() {
+    return Clock.system(ZoneId.of("Asia/Seoul"));
+  }
+
+  @Bean
+  TxnIdGenerator txnIdGenerator(PaymentMapper paymentMapper, Clock clock) {
+    return new TxnIdGenerator(paymentMapper, clock);
   }
 }
