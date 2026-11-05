@@ -48,10 +48,12 @@ class SchemaMigrationTest {
   }
 
   @Test
-  @DisplayName("M1 V1·V2가 적용되고 테이블이 12개와 거래고유번호 시퀀스가 생긴다")
-  void appliesV1() throws SQLException {
+  @DisplayName("M1 V1·V2가 적용되고 테이블 12개와 거래고유번호 시퀀스가 생긴다")
+  void appliesMigrations() throws SQLException {
     assertThat(migration.success).isTrue();
     assertThat(migration.migrationsExecuted).isEqualTo(2);
+    assertThat(queryLong("SELECT COUNT(*) FROM user_sequences WHERE sequence_name = 'TXN_ID_SEQ'"))
+      .isEqualTo(1);
     assertThat(queryLong("SELECT COUNT(*) FROM user_tables WHERE table_name <> 'flyway_schema_history'"))
       .isEqualTo(12);
   }
