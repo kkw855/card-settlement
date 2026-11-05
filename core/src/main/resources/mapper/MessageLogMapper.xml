@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.kkw855.settlement.core.message.MessageLogMapper">
+
+  <insert id="insert">
+    INSERT INTO message_log (txn_id, msg_type, direction, masked_payload, response_code, elapsed_ms)
+    VALUES (#{txnId}, #{msgType}, #{direction}, #{maskedPayload}, #{responseCode}, #{elapsedMs})
+  </insert>
+
+  <select id="findByTxnId" resultType="io.github.kkw855.settlement.core.message.MessageLog">
+    SELECT txn_id, msg_type, direction, masked_payload, response_code, elapsed_ms
+    FROM message_log
+    WHERE txn_id = #{txnId}
+    ORDER BY log_id
+  </select>
+
+</mapper>

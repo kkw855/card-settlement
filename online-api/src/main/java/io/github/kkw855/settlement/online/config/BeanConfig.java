@@ -4,9 +4,12 @@ import io.github.kkw855.settlement.core.card.CardProtector;
 import io.github.kkw855.settlement.core.crypto.AesGcmEncryptor;
 import io.github.kkw855.settlement.core.crypto.CryptoKeys;
 import io.github.kkw855.settlement.core.crypto.HmacHasher;
+import io.github.kkw855.settlement.core.message.MessageLogMapper;
 import io.github.kkw855.settlement.core.payment.PaymentMapper;
 import io.github.kkw855.settlement.core.payment.TxnIdGenerator;
+import io.github.kkw855.settlement.online.card.ApprovalGateway;
 import io.github.kkw855.settlement.online.card.CardCompanyClient;
+import io.github.kkw855.settlement.online.card.MessageLogger;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -47,5 +50,16 @@ class BeanConfig {
   @Bean
   TxnIdGenerator txnIdGenerator(PaymentMapper paymentMapper, Clock clock) {
     return new TxnIdGenerator(paymentMapper, clock);
+  }
+
+  @Bean
+  MessageLogger messageLogger(MessageLogMapper messageLogMapper) {
+    return new MessageLogger(messageLogMapper);
+  }
+
+  @Bean
+  ApprovalGateway approvalGateway(CardCompanyClient cardCompanyClient, MessageLogger messageLogger,
+                                  Clock clock) {
+    return new ApprovalGateway(cardCompanyClient, messageLogger, clock);
   }
 }

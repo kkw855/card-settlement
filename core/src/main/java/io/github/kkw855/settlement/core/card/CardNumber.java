@@ -19,6 +19,7 @@ public record CardNumber(String digits) {
     return digits.substring(0, 6) + "******" + digits.substring(12);
   }
 
+  @SuppressWarnings("NullableProblems")
   @Override
   public String toString() {
     return masked();

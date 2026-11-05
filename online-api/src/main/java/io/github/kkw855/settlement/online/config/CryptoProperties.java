@@ -11,6 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("crypto")
 public record CryptoProperties(String cardEncryptionKey, String cardHmacKey) {
 
+  @SuppressWarnings("NullableProblems")
   @Override
   public String toString() {
     return "CryptoProperties[cardEncryptionKey=****, cardHmacKey=****]";

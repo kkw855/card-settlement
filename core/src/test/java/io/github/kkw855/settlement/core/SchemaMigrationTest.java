@@ -13,7 +13,7 @@ import org.testcontainers.oracle.OracleContainer;
 import java.sql.*;
 
 /**
- * V1 마이그레이션을 실제 Oracle(compose와 같은 이미지)에 적용하고, DB가 지키는 불변식을 확인한다.
+ * 마이그레이션을 실제 Oracle(compose와 같은 이미지)에 적용하고, DB가 지키는 불변식을 확인한다.
  *
  * <p>테스트마다 자동 커밋을 끄고 끝나면 롤백해서 서로 영향을 주지 않는다.
  */
@@ -48,10 +48,10 @@ class SchemaMigrationTest {
   }
 
   @Test
-  @DisplayName("M1 V1이 적용되고 테이블이 12개가 생긴다")
+  @DisplayName("M1 V1·V2가 적용되고 테이블이 12개와 거래고유번호 시퀀스가 생긴다")
   void appliesV1() throws SQLException {
     assertThat(migration.success).isTrue();
-    assertThat(migration.migrationsExecuted).isEqualTo(1);
+    assertThat(migration.migrationsExecuted).isEqualTo(2);
     assertThat(queryLong("SELECT COUNT(*) FROM user_tables WHERE table_name <> 'flyway_schema_history'"))
       .isEqualTo(12);
   }
