@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1850" height="2586" viewBox="0 0 1850 2586" role="img" aria-labelledby="title desc">
+<title id="title">approval-sequence</title>
+<desc id="desc">현재 구현 기준 승인 성공 한 건의 호출 순서 (HTTP 요청부터 응답까지). 자세한 설명은 ../05-approval-flow.md 참조.</desc>
+<g font-family="-apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, Malgun Gothic, sans-serif">
+<rect x="0" y="0" width="1850" height="2586" rx="0" fill="#ffffff"/>
+<text x="60" y="76.0" font-size="38" font-weight="700" fill="#172b4d" text-anchor="start">승인 성공 한 건: 호출은 어떤 순서로 이어질까?</text>
+<text x="60" y="125.0" font-size="21" font-weight="400" fill="#52647c" text-anchor="start">위에서 아래로 읽으세요 · Oracle 저장과 카드사 통신의 경계를 함께 표시했습니다.</text>
+<rect x="60" y="154" width="1730" height="57" rx="8" fill="#fff6e8"/>
+<text x="82" y="191.0" font-size="21" font-weight="400" fill="#a95d12" text-anchor="start">가정: 올바른 API 키와 본문 · 새 멱등 키 · 활성 가맹점 · 정상 승인 응답. Controller도 Service도 트랜잭션을 열지 않습니다.</text>
+<rect x="50" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="160" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">PaymentController</text>
+<text x="160" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">HTTP 입구 + 인증</text>
+<path d="M 160.00,334.00 L 160.00,2195.00" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="300" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="410" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">ApprovalService</text>
+<text x="410" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">업무 흐름</text>
+<path d="M 410.00,334.00 L 410.00,2195.00" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="550" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="660" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">ApprovalGateway</text>
+<text x="660" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">전문 생성·해석</text>
+<path d="M 660.00,334.00 L 660.00,2195.00" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="805" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="915" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">MessageLogger</text>
+<text x="915" y="314.0" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">+ MessageLogMapper</text>
+<path d="M 915.00,334.00 L 915.00,2195.00" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="1060" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="1170" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">CardCompanyClient</text>
+<text x="1170" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">소켓 송수신</text>
+<path d="M 1170.00,334.00 L 1170.00,2195.00" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="1320" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="1430" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">SimulatorServer</text>
+<text x="1430" y="314.0" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">+ CardCompany</text>
+<path d="M 1430.00,334.00 L 1430.00,2195.00" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="1580" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="1690" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">Oracle DB</text>
+<text x="1690" y="314.0" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">payment / message_log</text>
+<path d="M 1690.00,334.00 L 1690.00,2195.00" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="50" y="358" width="340" height="71.3" rx="7" fill="#eef4fc"/>
+<text x="220.0" y="384.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">시작: POST /v1/payments</text>
+<text x="220.0" y="408.6" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">X-Api-Key · Idempotency-Key · 본문</text>
+<path d="M 160.00,490.00 L 1690.00,490.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,490.00 L 1679.25,495.33 L 1679.25,484.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="166" y="452" width="1518" height="29.1" rx="3" fill="#ffffff"/>
+<text x="925.0" y="473.0" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">1  MerchantAuthInterceptor.preHandle() → findByApiKeyHash(SHA-256(X-Api-Key))</text>
+<path d="M 1690.00,555.00 L 160.00,555.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 160.00,555.00 L 170.75,560.33 L 170.75,549.67 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="166" y="517" width="1518" height="29.1" rx="3" fill="#ffffff"/>
+<text x="925.0" y="538.0" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">가맹점 → 요청 속성(authenticatedMerchant)에 저장</text>
+<rect x="50" y="578" width="300" height="71.3" rx="7" fill="#eef4fc"/>
+<text x="200.0" y="604.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">2  @Valid 본문 검증</text>
+<text x="200.0" y="628.6" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">Idempotency-Key 확인</text>
+<path d="M 160.00,710.00 L 410.00,710.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 410.00,710.00 L 399.25,715.33 L 399.25,704.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="166" y="672" width="238" height="29.1" rx="3" fill="#ffffff"/>
+<text x="285.0" y="693.0" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">3  approve(...)</text>
+<rect x="300" y="728" width="300" height="71.3" rx="7" fill="#eef4fc"/>
+<text x="450.0" y="754.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">4  정지 가맹점·할부 조건 검사</text>
+<text x="450.0" y="778.6" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">통과해야 결제를 저장한다</text>
+<path d="M 410.00,860.00 L 1690.00,860.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,860.00 L 1679.25,865.33 L 1679.25,854.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="416" y="822" width="1268" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1050" y="843" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">5  TxnIdGenerator.next() → PaymentMapper.nextTxnSequence() → NEXTVAL</text>
+<rect x="300" y="883" width="300" height="71.3" rx="7" fill="#eef4fc"/>
+<text x="450" y="909" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">6  CardProtector.protect()</text>
+<text x="450" y="933.65" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">카드번호 암호화·해시·마스킹</text>
+<path d="M 410.00,994.00 L 1690.00,994.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,994.00 L 1679.25,999.33 L 1679.25,988.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="416" y="956" width="1268" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1050" y="977" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">7  PaymentMapper.insert(REQUESTED) → 커밋</text>
+<rect x="1470" y="1011" width="320" height="71.3" rx="7" fill="#edf8f8"/>
+<text x="1630" y="1037" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">이 시점부터 다른 연결에서도</text>
+<text x="1630" y="1061.65" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">REQUESTED 결제를 조회 가능</text>
+<path d="M 410.00,1129.00 L 660.00,1129.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 660.00,1129.00 L 649.25,1134.33 L 649.25,1123.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="416" y="1091" width="238" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="535" y="1112" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">8  approve(request)</text>
+<rect x="550" y="1147" width="245" height="71.3" rx="7" fill="#eef4fc"/>
+<text x="672.5" y="1173" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">9  0100 전문 생성</text>
+<text x="672.5" y="1197.65" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">CardMessageLayouts</text>
+<path d="M 660.00,1258.00 L 915.00,1258.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 915.00,1258.00 L 904.25,1263.33 L 904.25,1252.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="666" y="1220" width="243" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="787.5" y="1241" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">10  sent(..., "0100", ...)</text>
+<path d="M 915.00,1323.00 L 1690.00,1323.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,1323.00 L 1679.25,1328.33 L 1679.25,1317.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="921" y="1285" width="763" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1302.5" y="1306" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">MessageLogMapper.insert() → SEND 로그 커밋</text>
+<path d="M 660.00,1398.00 L 1170.00,1398.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 1170.00,1398.00 L 1159.25,1403.33 L 1159.25,1392.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="666" y="1360" width="498" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="915" y="1381" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">11  send(message) → Socket.connect()</text>
+<path d="M 1170.00,1463.00 L 1430.00,1463.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 1430.00,1463.00 L 1419.25,1468.33 L 1419.25,1457.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="1176" y="1425" width="248" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1300" y="1446" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">12  Framing.write(0100)</text>
+<rect x="1292" y="1481" width="276" height="71.3" rx="7" fill="#f5effb"/>
+<text x="1430" y="1507" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">13  Framing.read() → handle()</text>
+<text x="1430" y="1531.65" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">승인 판단·메모리 원장 저장</text>
+<path d="M 1430.00,1595.00 L 1170.00,1595.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 1170.00,1595.00 L 1180.75,1589.67 L 1180.75,1600.33 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="1176" y="1557" width="248" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1300" y="1578" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">14  Framing.write(0110)</text>
+<path d="M 1170.00,1660.00 L 660.00,1660.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 660.00,1660.00 L 670.75,1654.67 L 670.75,1665.33 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="666" y="1622" width="498" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="915" y="1643" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">15  Framing.read() → Outcome.Received</text>
+<path d="M 660.00,1725.00 L 915.00,1725.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 915.00,1725.00 L 904.25,1730.33 L 904.25,1719.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="666" y="1687" width="243" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="787.5" y="1708" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">16  received(...)</text>
+<path d="M 915.00,1790.00 L 1690.00,1790.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,1790.00 L 1679.25,1795.33 L 1679.25,1784.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="921" y="1752" width="763" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1302.5" y="1773" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">MessageLogMapper.insert() → RECV 로그 커밋</text>
+<rect x="550" y="1807" width="245" height="71.3" rx="7" fill="#eef4fc"/>
+<text x="672.5" y="1833" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">17  0110·거래번호 검증</text>
+<text x="672.5" y="1857.65" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">응답 코드·승인정보 해석</text>
+<path d="M 660.00,1920.00 L 410.00,1920.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 410.00,1920.00 L 420.75,1914.67 L 420.75,1925.33 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="416" y="1882" width="238" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="535" y="1903" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">18  Result.Approved</text>
+<path d="M 410.00,1985.00 L 1690.00,1985.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,1985.00 L 1679.25,1990.33 L 1679.25,1979.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="416" y="1947" width="1268" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1050" y="1968" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">19  PaymentMapper.approve() → APPROVED 갱신·커밋 (WHERE status = REQUESTED)</text>
+<path d="M 410.00,2050.00 L 1690.00,2050.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,2050.00 L 1679.25,2055.33 L 1679.25,2044.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="416" y="2012" width="1268" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1050" y="2033" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">20  findByTxnId() → 최종 Payment 조회</text>
+<path d="M 1690.00,2115.00 L 410.00,2115.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 410.00,2115.00 L 420.75,2109.67 L 420.75,2120.33 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="416" y="2077" width="1268" height="29.099999999999998" rx="3" fill="#ffffff"/>
+<text x="1050" y="2098" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">Payment 조회 결과 반환</text>
+<path d="M 410.00,2180.00 L 160.00,2180.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 160.00,2180.00 L 170.75,2185.33 L 170.75,2174.67 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="166" y="2142" width="238" height="29.1" rx="3" fill="#ffffff"/>
+<text x="285.0" y="2163.0" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">21  ApprovalOutcome</text>
+<rect x="50" y="2198" width="420" height="74.2" rx="7" fill="#eef4fc"/>
+<text x="260.0" y="2225.0" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">22  201 Created + Location</text>
+<text x="260.0" y="2251.1" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">PaymentResponse(JSON) → 가맹점</text>
+<rect x="50" y="2308" width="1750" height="224" rx="12" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="76" y="2349.0" font-size="24" font-weight="700" fill="#172b4d" text-anchor="start">성공 경로 밖에서 달라지는 점</text>
+<text x="76" y="2393.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 검사 순서: 401(API 키) → 400(본문·Idempotency-Key) → 403(정지 가맹점) → 422(할부). 여기서 막히면 저장도 전송도 없음</text>
+<text x="76" y="2431.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 같은 멱등 키: 처리 중이면 409, 본문이 다르면 422, 끝났으면 저장된 결과로 201 재현 → 카드사 재전송 없음</text>
+<text x="76" y="2469.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 연결 실패: DECLINED(P001)   /   타임아웃·확인 불가: UNKNOWN(P003). 둘 다 201이고 성공 여부는 status로 판단 · 망취소는 아직 없음</text>
+<text x="76" y="2507.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• SEND는 전송 전에 남김. RECV는 응답 필드 일부를 읽은 뒤, 전문구분·거래번호 검증 전에 남김.</text>
+</g></svg>

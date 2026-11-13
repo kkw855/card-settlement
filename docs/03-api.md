@@ -110,9 +110,12 @@ INSERT payment (status = REQUESTED, merchant_id, idempotency_key, ...) → 커�
 ## 6. 인증과 가맹점 격리
 
 - `X-Api-Key`의 SHA-256으로 `merchant.api_key_hash`를 찾아 가맹점을 정한다. 가맹점번호를 본문으로 받지 않으므로 다른 가맹점 이름으로 결제하거나 취소할 수 없다.
+- **인증은 인터셉터(`MerchantAuthInterceptor`, `/v1/**`)에서 한다.** 인터셉터는 컨트롤러 매개변수(요청 본문 포함)를 만들기 전에 돈다. 그래서 키가 틀린 요청은 본문이 틀려도 401이다. 인증되지 않은 요청의 본문은 읽지도 검증하지도 않는다.
+- **설정이 빠져도 열리지 않게 했다 (fail closed).** 컨트롤러는 가맹점을 `@RequestAttribute`로 받는다. 인터셉터 등록이 빠지면 요청 속성이 비어 400으로 끝나고 결제는 만들어지지 않는다. `HandlerMethodArgumentResolver`로 가맹점을 만드는 방법도 있지만, 그 등록이 빠지면 Spring은 `Merchant`를 일반 객체로 보고 요청 파라미터로 채운다(`@ModelAttribute` 기본 동작). 구현 중에 `?merchantId=…&status=ACTIVE`만 붙여 다른 가맹점 이름으로 승인되는 것을 재현했다. 설정 실수가 보안 구멍이 되지 않는 쪽을 골랐다.
+- **`/v1` 아래 없는 경로도 키가 없으면 404가 아니라 401이다.** 인터셉터는 경로 패턴으로 걸리므로 처리할 컨트롤러가 없는 경로에도 돈다. 키 없이 경로를 더듬어 어떤 API가 있는지 알아낼 수 없다.
 - **다른 가맹점의 `txnId`는 404로 응답한다.** 403이면 "그 거래가 존재한다"는 정보를 주게 된다.
 - **API 키는 HMAC 없이 SHA-256만으로 충분하다.** 카드번호는 모르는 자리가 6개라 후보가 10⁶개뿐이다 ([ADR-0005](adr/0005-card-data-protection.md)). API 키는 무작위 32바이트라 후보가 2²⁵⁶개여서 전수 대입이 불가능하다.
-- `SUSPENDED` 가맹점은 승인·취소가 403이다. 조회는 허용한다. 정지 전 거래를 확인할 수 있어야 하기 때문이다.
+- `SUSPENDED` 가맹점은 승인·취소가 403이다. 조회는 허용한다. 정지 전 거래를 확인할 수 있어야 하기 때문이다. 그래서 정지 검사는 인터셉터가 아니라 서비스가 하고, 결제를 저장하기 전에 한다 ([05-approval-flow.md](05-approval-flow.md) 검사 순서).
 - v1은 키 발급 API 없이 시드 데이터로 넣는다.
 
 ## 7. 카드번호가 새는 길 막기 (I10)
@@ -132,6 +135,9 @@ INSERT payment (status = REQUESTED, merchant_id, idempotency_key, ...) → 커�
 - 유효기간도 형식만 본다. 만료 판단은 카드사 몫이다 (`1002`).
 - 할부는 `0`(일시불) 또는 `2`~`36`개월이다. 국내 신용카드 할부는 보통 5만 원 이상 결제에만 허용되므로, 5만 원 미만 할부는 422 `INSTALLMENT_NOT_ALLOWED`다.
 - 금액 상한은 전문 거래금액 필드(12자리)의 한도인 999,999,999,999원이다.
+- **금액은 정수만 받는다.** `"amount": 10000.5`는 400이다. Jackson 기본 설정(`ACCEPT_FLOAT_AS_INT`)은 소수를 정수 필드에 넣을 때 소수점 아래를 버린다. 그대로 두면 가맹점이 보낸 금액과 다른 10,000원으로 승인된다. `spring.jackson.deserialization.accept-float-as-int: false`로 막는다.
+- **빠진 숫자 필드를 0으로 채우지 않는다.** `installmentMonths`와 `amount`를 `Integer`·`Long` + `@NotNull`로 받아 "필수다"로 400을 낸다. 기본형(`int`)으로 받으면 Jackson 설정에 따라 본문 전체가 거부되어 어느 필드인지 알 수 없거나, 0이 들어가 일시불로 승인된다.
+- **`Idempotency-Key` 형식은 컨트롤러에서 직접 검사한다.** 헤더 매개변수에 `@Size`·`@Pattern`을 붙이면 Spring의 메서드 검증이 켜진다. 그러면 본문 `@Valid` 오류도 `HandlerMethodValidationException`으로 바뀌어 `code`와 `errors`가 없는 기본 응답이 나간다.
 - 시각은 KST 오프셋(`+09:00`)을 붙여 내보낸다. DB는 KST `TIMESTAMP`로 저장한다 ([01-erd.md](01-erd.md)).
 
 ## 알려진 한계 (v1)

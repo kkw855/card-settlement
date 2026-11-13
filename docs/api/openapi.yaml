@@ -137,6 +137,7 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/payments/{txnId}:
     get:
@@ -154,6 +155,7 @@ paths:
               schema: { $ref: "#/components/schemas/Payment" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/PaymentNotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/payments/{txnId}/cancel:
     post:
@@ -241,6 +243,7 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "500": { $ref: "#/components/responses/InternalError" }
 
 components:
   securitySchemes:
@@ -282,19 +285,21 @@ components:
     BadRequest:
       description: |
         - `VALIDATION_FAILED`: 형식 오류. `errors`에 필드와 이유만 담고 **입력값은 담지 않는다** (I10).
+          JSON 문법 오류, 타입 불일치(소수 금액 포함), `Idempotency-Key` 형식 오류도 이 코드다. 이때는 `errors`가 없다.
         - `IDEMPOTENCY_KEY_REQUIRED`: 승인 요청에 `Idempotency-Key`가 없다.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
           example:
-            type: about:blank
             title: Bad Request
             status: 400
+            detail: 요청 형식이 맞지 않다
+            instance: /v1/payments
             code: VALIDATION_FAILED
             errors:
               - { field: cardNumber, reason: 숫자 16자리여야 한다 }
     Unauthorized:
-      description: "`UNAUTHORIZED`: API 키가 없거나 틀렸다."
+      description: "`UNAUTHORIZED`: API 키가 없거나 틀렸다. 본문보다 먼저 확인하므로 본문이 틀려도 401이다."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -305,6 +310,14 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     PaymentNotFound:
       description: "`PAYMENT_NOT_FOUND`: 거래가 없거나 다른 가맹점의 거래다."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    InternalError:
+      description: |
+        `INTERNAL_ERROR`: 예상하지 못한 오류. 응답에 예외 메시지나 스택 같은 내부 정보를 넣지 않는다.
+        승인 요청이었다면 결과를 알 수 없으므로 같은 `Idempotency-Key`로 다시 보낸다.
+        이미 끝난 결제면 그 결과가 재현되고, 저장 전에 실패했으면 새로 처리된다.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -345,7 +358,7 @@ components:
           format: int64
           minimum: 1
           maximum: 999999999999
-          description: 결제 금액 (원). 상한은 전문 거래금액 필드 12자리.
+          description: 결제 금액 (원). 정수만 받는다 (`10000.5`는 400). 상한은 전문 거래금액 필드 12자리.
           example: 10000
 
     CancelRequest:
@@ -450,10 +463,14 @@ components:
 
     Problem:
       type: object
-      description: RFC 9457 Problem Details + 가맹점이 분기할 `code`
-      required: [type, title, status, code]
+      description: |
+        RFC 9457 Problem Details + 가맹점이 분기할 `code`.
+        - 이 계약에 적힌 오류 응답에는 늘 `code`가 있다. 가맹점은 HTTP 상태가 아니라 `code`로 분기한다.
+        - 계약 밖의 오류(지원하지 않는 메서드 405, 지원하지 않는 Content-Type 415, 없는 경로 404)는 Spring 기본 Problem이라 `code`가 없다.
+        - `type`은 `about:blank`라 응답에서 빠진다. RFC 9457 3.1.1에 따라 없으면 `about:blank`로 본다.
+      required: [title, status, code]
       properties:
-        type: { type: string, default: about:blank }
+        type: { type: string, default: about:blank, description: "`about:blank`이면 생략된다" }
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
