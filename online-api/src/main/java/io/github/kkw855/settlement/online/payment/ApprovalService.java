@@ -3,6 +3,7 @@ package io.github.kkw855.settlement.online.payment;
 import io.github.kkw855.settlement.core.card.CardProtector;
 import io.github.kkw855.settlement.core.card.ProtectedCard;
 import io.github.kkw855.settlement.core.merchant.Merchant;
+import io.github.kkw855.settlement.core.merchant.MerchantStatus;
 import io.github.kkw855.settlement.core.payment.Payment;
 import io.github.kkw855.settlement.core.payment.PaymentMapper;
 import io.github.kkw855.settlement.core.payment.PaymentStatus;
@@ -10,6 +11,8 @@ import io.github.kkw855.settlement.core.payment.TxnIdGenerator;
 import io.github.kkw855.settlement.online.card.ApprovalGateway;
 import io.github.kkw855.settlement.online.card.ApprovalGateway.Result;
 import io.github.kkw855.settlement.online.card.ApprovalRequest;
+import io.github.kkw855.settlement.online.error.ApiException;
+import io.github.kkw855.settlement.online.error.ErrorCode;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -50,8 +53,11 @@ public class ApprovalService {
   }
 
   public ApprovalOutcome approve(Merchant merchant, String idempotencyKey, ApprovalCommand command) {
+    if (merchant.status() == MerchantStatus.SUSPENDED) { // 조회는 허용하고 승인·취소만 막는다 (docs/03-api.md 6장)
+      throw new ApiException(ErrorCode.MERCHANT_SUSPENDED, "정지된 가맹점은 승인을 요청할 수 없다");
+    }
     if (command.installmentMonths() > 0 && command.amount() < MIN_INSTALLMENT_AMOUNT) {
-      throw new PaymentException(ErrorCode.INSTALLMENT_NOT_ALLOWED,
+      throw new ApiException(ErrorCode.INSTALLMENT_NOT_ALLOWED,
         String.format(Locale.KOREA, "할부는 %,d원 이상만 가능하다", MIN_INSTALLMENT_AMOUNT));
     }
 
@@ -101,10 +107,10 @@ public class ApprovalService {
       && existing.amount() == command.amount()
       && existing.installmentMonths() == command.installmentMonths();
     if (!sameBody) {
-      throw new PaymentException(ErrorCode.IDEMPOTENCY_KEY_REUSED, "같은 Idempotency-Key에 다른 요청 본문");
+      throw new ApiException(ErrorCode.IDEMPOTENCY_KEY_REUSED, "같은 Idempotency-Key에 다른 요청 본문");
     }
     if (existing.status() == PaymentStatus.REQUESTED) {
-      throw new PaymentException(ErrorCode.PAYMENT_IN_PROGRESS, "같은 Idempotency-Key의 요청을 처리하고 있다");
+      throw new ApiException(ErrorCode.PAYMENT_IN_PROGRESS, "같은 Idempotency-Key의 요청을 처리하고 있다");
     }
     return new ApprovalOutcome.Replayed(existing);
   }

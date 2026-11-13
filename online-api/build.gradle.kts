@@ -11,12 +11,14 @@ dependencies {
   implementation(project(":codec"))
 
   implementation(libs.spring.boot.starter.webmvc)
+  implementation(libs.spring.boot.starter.validation) // @Valid (Hibernate Validator)
   implementation(libs.mybatis.spring.boot.starter)  // DataSource(HikariCP)와 JDBC도 함께 들어온다
   implementation(libs.spring.boot.starter.flyway)   // 기동할 때 V1을 적용한다 (ADR-0006)
   runtimeOnly(libs.flyway.database.oracle)
   runtimeOnly(libs.ojdbc17)
 
   testImplementation(libs.spring.boot.starter.test)
+  testImplementation(libs.spring.boot.starter.webmvc.test) // MockMvc (Boot 4부터 별도 모듈)
   testImplementation(libs.spring.boot.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.oracle.free)

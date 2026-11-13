@@ -14,6 +14,8 @@ import io.github.kkw855.settlement.core.payment.TxnIdGenerator;
 import io.github.kkw855.settlement.online.IntegrationTest;
 import io.github.kkw855.settlement.online.card.CardCompanyClient;
 import io.github.kkw855.settlement.online.card.CardCompanyClient.Outcome;
+import io.github.kkw855.settlement.online.error.ApiException;
+import io.github.kkw855.settlement.online.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -75,13 +77,7 @@ class ApprovalServiceTest extends IntegrationTest {
 
   @BeforeEach
   void newMerchant() {
-    String merchantNo = "S%09d".formatted(ThreadLocalRandom.current().nextInt(1_000_000_000));
-    String apiKeyHash = HexFormat.of().formatHex(UUID.randomUUID().toString().getBytes())
-      .substring(0, 64);
-    merchantMapper.insert(new Merchant(null, merchantNo, "홍길동카페", 2,
-      "004", "enc", "123-****-7890", "홍길동",
-      MerchantStatus.ACTIVE, apiKeyHash));
-    merchant = merchantMapper.findByMerchantNo(merchantNo).orElseThrow();
+    merchant = insertMerchant(MerchantStatus.ACTIVE);
   }
 
   @Test
@@ -169,7 +165,7 @@ class ApprovalServiceTest extends IntegrationTest {
     approve("key-1", 10_000, 0);
 
     assertThatThrownBy(() -> approve("key-1", 20_000, 0))
-      .isInstanceOfSatisfying(PaymentException.class,
+      .isInstanceOfSatisfying(ApiException.class,
         e -> assertThat(e.code()).isEqualTo(ErrorCode.IDEMPOTENCY_KEY_REUSED));
   }
 
@@ -182,7 +178,7 @@ class ApprovalServiceTest extends IntegrationTest {
       0, 10_000, LocalDateTime.now())); // 다른 요청이 처리 중인 상태를 만든다
 
     assertThatThrownBy(() -> approve("key-1", 10_000, 0))
-      .isInstanceOfSatisfying(PaymentException.class,
+      .isInstanceOfSatisfying(ApiException.class,
         e -> assertThat(e.code()).isEqualTo(ErrorCode.PAYMENT_IN_PROGRESS));
     verify(cardCompanyClient, never()).send(any());
   }
@@ -191,7 +187,7 @@ class ApprovalServiceTest extends IntegrationTest {
   @DisplayName("V9 5만 원 미만 할부는 저장도 전송도 하지 않고 거절한다")
   void rejectsSmallInstallment() {
     assertThatThrownBy(() -> approve("key-1", 49_999, 3))
-      .isInstanceOfSatisfying(PaymentException.class,
+      .isInstanceOfSatisfying(ApiException.class,
         e -> assertThat(e.code()).isEqualTo(ErrorCode.INSTALLMENT_NOT_ALLOWED));
     assertThat(paymentMapper.findByIdempotencyKey(merchant.merchantId(), "key-1"))
       .isEmpty();
@@ -218,6 +214,31 @@ class ApprovalServiceTest extends IntegrationTest {
     assertThat(statusSeenByOtherConnection).hasValue("REQUESTED");
   }
 
+  @Test
+  @DisplayName("V11 정지된 가맹점은 MERCHANT_SUSPENDED. 저장도 전송도 하지 않는다")
+  void rejectsSuspendedMerchant() {
+    merchant = insertMerchant(MerchantStatus.SUSPENDED);
+
+    assertThatThrownBy(() -> approve("key-1", 10_000, 0))
+      .isInstanceOfSatisfying(ApiException.class,
+        e -> assertThat(e.code()).isEqualTo(ErrorCode.MERCHANT_SUSPENDED));
+    assertThat(paymentMapper.findByIdempotencyKey(merchant.merchantId(), "key-1"))
+      .isEmpty();
+    verify(cardCompanyClient, never()).send(any());
+  }
+
+  // ---------------------------------------------------------------- 도우미
+
+  private Merchant insertMerchant(MerchantStatus status) {
+    String merchantNo = "S%09d".formatted(ThreadLocalRandom.current().nextInt(1_000_000_000));
+    String apiKeyHash = HexFormat.of().formatHex(UUID.randomUUID().toString().getBytes())
+      .substring(0, 64);
+    merchantMapper.insert(new Merchant(null, merchantNo, "홍길동카페", 2,
+      "004", "enc", "123-****-7890", "홍길동",
+      status, apiKeyHash));
+    return merchantMapper.findByMerchantNo(merchantNo).orElseThrow();
+  }
+
   /** 커넥션 풀에서 새 연결을 따로 받아 조회한다. 서비스가 쓰는 연결과 다른 세션이다. */
   private String statusFromNewConnection(String txnId) throws SQLException {
     try (Connection connection = dataSource.getConnection();
@@ -228,8 +249,6 @@ class ApprovalServiceTest extends IntegrationTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------- 도우미
 
   private ApprovalOutcome approve(String idempotencyKey, long amount, int installmentMonths) {
     return approvalService.approve(merchant, idempotencyKey,
