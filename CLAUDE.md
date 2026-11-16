@@ -9,6 +9,7 @@
 - `docs/03-api.md` + `docs/api/openapi.yaml` — 승인·취소 API 계약과 설계 이유 (멱등성, 결과 코드, 응답 시간 상한)
 - `docs/04-batch.md` — 배치 잡 구성, 재시작 규칙, 대사 분류, 정산·배분, 지급 파일, 인덱스, 측정 계획
 - `docs/05-approval-flow.md` + `docs/diagrams/` — 구현된 승인 흐름: 클래스 연결도, 호출 순서, 검사 순서, 트랜잭션 경계, 오류 응답. 구현이 바뀌면 다이어그램(SVG·PNG)도 갱신한다.
+- `docs/06-local-run.md` — 로컬 실행(compose, 시뮬레이터, bootRun의 local 프로필과 가맹점 시드), 스모크 테스트(`scripts/smoke-test.sh`), 문제 해결. 승인 결과가 바뀌면(예: 망취소) 4장 표와 스크립트의 기대값을 함께 맞춘다.
 - `core/src/main/resources/db/migration/` — Flyway 마이그레이션 (ADR-0006). 적용된 파일은 고치지 않고 새 버전을 추가한다.
 - `docs/adr/` — 설계 결정. 결정을 바꾸면 새 ADR을 추가하고 기존 ADR 상태를 갱신한다.
 

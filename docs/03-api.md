@@ -116,7 +116,7 @@ INSERT payment (status = REQUESTED, merchant_id, idempotency_key, ...) → 커�
 - **다른 가맹점의 `txnId`는 404로 응답한다.** 403이면 "그 거래가 존재한다"는 정보를 주게 된다.
 - **API 키는 HMAC 없이 SHA-256만으로 충분하다.** 카드번호는 모르는 자리가 6개라 후보가 10⁶개뿐이다 ([ADR-0005](adr/0005-card-data-protection.md)). API 키는 무작위 32바이트라 후보가 2²⁵⁶개여서 전수 대입이 불가능하다.
 - `SUSPENDED` 가맹점은 승인·취소가 403이다. 조회는 허용한다. 정지 전 거래를 확인할 수 있어야 하기 때문이다. 그래서 정지 검사는 인터셉터가 아니라 서비스가 하고, 결제를 저장하기 전에 한다 ([05-approval-flow.md](05-approval-flow.md) 검사 순서).
-- v1은 키 발급 API 없이 시드 데이터로 넣는다.
+- v1은 키 발급 API 없이 시드 데이터로 넣는다. 로컬에서는 `LocalDataSeeder`가 `local` 프로필로 기동할 때 `.env`의 `LOCAL_MERCHANT_API_KEY`로 가맹점 M000000001을 넣는다 ([06-local-run.md](06-local-run.md)).
 
 ## 7. 카드번호가 새는 길 막기 (I10)
 
