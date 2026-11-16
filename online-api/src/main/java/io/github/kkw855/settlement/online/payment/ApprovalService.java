@@ -87,6 +87,7 @@ public class ApprovalService {
       case Result.NotSent() ->
         paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
           PaymentStatus.DECLINED, ResultCodes.NOT_SENT);
+      //noinspection unused
       case Result.Unknown(String reason) -> // 망취소는 2-7에서 붙인다. 지금은 미확정으로 남긴다
         paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
           PaymentStatus.UNKNOWN, ResultCodes.UNRESOLVED);

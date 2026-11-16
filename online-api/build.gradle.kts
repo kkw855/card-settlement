@@ -27,4 +27,5 @@ dependencies {
 // 루트에서 실행해야 application.yaml의 optional:file:.env[.properties]가 루트의 .env를 찾는다
 tasks.named<BootRun>("bootRun") {
   workingDir = rootDir
+  systemProperty("spring.profiles.active", "local") // 로컬 가맹점을 넣는다 (LocalDataSeeder)
 }
