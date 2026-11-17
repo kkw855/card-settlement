@@ -29,9 +29,11 @@ public final class MessageLogger {
       null, null));
   }
 
+  /** 응답코드는 형식에 맞을 때만 response_code에 넣는다. 틀린 값도 원문(masked_payload)에는 그대로 남는다. */
   public void received(String txnId, String msgType, byte[] payload, String responseCode, long elapsedMs) {
+    String code = CardMessageLayouts.isResponseCode(responseCode) ? responseCode : null; // CHAR(4)에 한글을 넣으면 저장이 실패한다
     mapper.insert(new MessageLog(txnId, msgType, "RECV", mask(msgType, payload),
-      responseCode, elapsedMs));
+      code, elapsedMs));
   }
 
   static String mask(String msgType, byte[] payload) {

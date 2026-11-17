@@ -3,6 +3,8 @@ package io.github.kkw855.settlement.online.card;
 import io.github.kkw855.settlement.codec.Field;
 import io.github.kkw855.settlement.codec.Layout;
 
+import java.util.regex.Pattern;
+
 /**
  * PG 쪽 카드사 전문 레이아웃 (docs/02-message-spec.md 2~3장).
  *
@@ -76,6 +78,22 @@ public final class CardMessageLayouts {
   public static final Layout NET_CANCEL_RESPONSE= Layout.of("0430", MESSAGE_LENGTH,
     MSG_TYPE, TXN_ID, SENT_AT, RESPONSE_CODE, HEADER_RESERVED,
     ORIGINAL_TXN_ID, NET_CANCEL_RESULT, NET_CANCEL_RESPONSE_RESERVED);
+
+  // 응답 값의 형식 (docs/02-message-spec.md 2~3장). 카드사 응답은 외부 입력이라 DB에 넣기 전에 확인한다.
+  // 두 값은 바이트 단위 컬럼(CHAR(4), CHAR(8))에 들어간다. 한글은 전문(MS949)에서 2바이트라 길이가 맞아도
+  // DB(AL32UTF8)에서는 3바이트라 넘친다 (ORA-12899). 그래서 ASCII만 받는다.
+  private static final Pattern RESPONSE_CODE_FORMAT = Pattern.compile("[0-9]{4}");
+  private static final Pattern APPROVAL_NO_FORMAT = Pattern.compile("[0-9A-Za-z]{1,8}");
+
+  /** 응답코드는 숫자 4자리다. 비어 있으면(요청 전문의 값) 응답으로는 틀린 값이다. */
+  public static boolean isResponseCode(String value) {
+    return value != null && RESPONSE_CODE_FORMAT.matcher(value).matches();
+  }
+
+  /** 승인번호는 영문·숫자 1~8자리다. 정상(0000) 응답에 승인번호가 없으면 틀린 응답이다. */
+  public static boolean isApprovalNo(String value) {
+    return value != null && APPROVAL_NO_FORMAT.matcher(value).matches();
+  }
 
   private CardMessageLayouts() {}
 }

@@ -2,6 +2,8 @@ package io.github.kkw855.settlement.online.card;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static io.github.kkw855.settlement.online.card.CardMessageLayouts.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,6 +58,21 @@ class CardMessageLayoutsTest {
     // Layout은 만들 때 빈틈·겹침과 전체 길이를 검사한다. 이 클래스가 로딩되면 6종 모두 통과한 것이다.
     assertThat(List.of(APPROVAL_REQUEST, APPROVAL_RESPONSE, CANCEL_REQUEST, CANCEL_RESPONSE, NET_CANCEL_REQUEST, NET_CANCEL_RESPONSE))
       .allSatisfy(layout -> assertThat(layout.length()).isEqualTo(MESSAGE_LENGTH));
+  }
+
+  @ParameterizedTest(name = "{0} -> {1}")
+  @CsvSource({"0000, true", "1001, true", "'', false", "거절, false", "' 000', false", "12A4, false"})
+  @DisplayName("응답코드는 숫자 4자리만 맞다")
+  void responseCodeFormat(String responseCode, boolean valid) {
+    assertThat(isResponseCode(responseCode)).isEqualTo(valid);
+  }
+
+  @ParameterizedTest(name = "{0} -> {1}")
+  @CsvSource({"1, true", "30000001, true", "Ab12Cd34, true", "'', false", "승인번호, false", "12-34, false",
+    "' 1234567', false"})
+  @DisplayName("승인번호는 영문·숫자 1~8자리만 맞다")
+  void approvalNoFormat(String approvalNo, boolean valid) {
+    assertThat(isApprovalNo(approvalNo)).isEqualTo(valid);
   }
 
   private static byte[] ascii(String s) {

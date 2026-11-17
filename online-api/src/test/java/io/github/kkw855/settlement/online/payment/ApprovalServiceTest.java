@@ -19,6 +19,8 @@ import io.github.kkw855.settlement.online.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -41,6 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static io.github.kkw855.settlement.online.card.CardMessageLayouts.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -225,6 +228,32 @@ class ApprovalServiceTest extends IntegrationTest {
     assertThat(paymentMapper.findByIdempotencyKey(merchant.merchantId(), "key-1"))
       .isEmpty();
     verify(cardCompanyClient, never()).send(any());
+  }
+
+  @ParameterizedTest(name = "응답코드 {0}")
+  @ValueSource(strings = {"거절", ""})
+  @DisplayName("V12 응답코드가 숫자 4자리가 아니면 UNKNOWN. RECV 로그는 남기고 응답코드 칸은 비운다")
+  void unknownWhenResponseCodeIsMalformed(String responseCode) {
+    respondWith(responseCode, null);
+
+    Payment payment = approve("key-1", 10_000, 0).payment();
+
+    assertThat(payment.status()).isEqualTo(PaymentStatus.UNKNOWN);
+    assertThat(messageLogMapper.findByTxnId(payment.txnId()))
+      .extracting(MessageLog::direction, MessageLog::responseCode)
+      .containsExactly(tuple("SEND", null), tuple("RECV", null));
+  }
+
+  @ParameterizedTest(name = "승인번호 {0}")
+  @ValueSource(strings = {"승인번호", ""})
+  @DisplayName("V13 정상(0000) 응답이어도 승인번호가 영문·숫자 1~8자리가 아니면 승인하지 않는다 (UNKNOWN)")
+  void unknownWhenApprovalNoIsMalformed(String approvalNo) {
+    respondWith("0000", approvalNo);
+
+    Payment payment = approve("key-1", 10_000, 0).payment();
+
+    assertThat(payment.status()).isEqualTo(PaymentStatus.UNKNOWN);
+    assertThat(payment.approvalNo()).isNull();
   }
 
   // ---------------------------------------------------------------- 도우미

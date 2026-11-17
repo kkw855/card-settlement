@@ -14,7 +14,8 @@ import java.time.format.DateTimeParseException;
  * 0100 승인 요청을 만들어 보내고, 0110 응답을 해석한다.
  *
  * <p>응답이 와도 믿을 수 없으면 {@link Result.Unknown}이다. 전문구분코드가 0110이 아니거나, 거래고유번호가 내가 보낸 것과
- * 다르거나, 필드가 깨져 있으면 카드사가 무엇을 처리했는지 알 수 없다. 이런 응답으로 승인을 기록하지 않는다.
+ * 다르거나, 필드가 깨져 있거나, 응답코드·승인번호의 형식이 틀리면 카드사가 무엇을 처리했는지 알 수 없다.
+ * 이런 응답으로 승인을 기록하지 않는다.
  */
 public final class ApprovalGateway {
 
@@ -79,11 +80,19 @@ public final class ApprovalGateway {
       if (!"0110".equals(reader.getDigits(MSG_TYPE)) || !txnId.equals(reader.getText(TXN_ID))) {
         return new Result.Unknown("응답 전문이 요청과 맞지 않는다");
       }
+      // 형식이 틀린 값을 그대로 저장하면 UPDATE가 실패해 결제가 REQUESTED에 멈춘다
+      if (!CardMessageLayouts.isResponseCode(responseCode)) {
+        return new Result.Unknown("응답코드 형식이 틀렸다");
+      }
       if (!"0000".equals(responseCode)) {
         return new Result.Declined(responseCode);
       }
-      return new Result.Approved(reader.getText(APPROVAL_NO),
-        LocalDateTime.parse(reader.getDigits(APPROVED_AT), TIMESTAMP));
+      String approvalNo = reader.getText(APPROVAL_NO);
+      if (!CardMessageLayouts.isApprovalNo(approvalNo)) {
+        return new Result.Unknown("승인번호 형식이 틀렸다"); // 카드사 쪽에는 승인이 남아 있다. 기록할 수 없으니 망취소로 되돌려야 한다
+      }
+
+      return new Result.Approved(approvalNo, LocalDateTime.parse(reader.getDigits(APPROVED_AT), TIMESTAMP));
     } catch (CodecException | DateTimeParseException e) {
       return new Result.Unknown("응답 전문을 해석할 수 없다: " + e.getClass().getSimpleName());
     }
