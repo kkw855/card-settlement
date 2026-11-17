@@ -19,8 +19,8 @@
 | [CardProtector](../core/src/main/java/io/github/kkw855/settlement/core/card/CardProtector.java) | DB에 보관할 카드번호의 암호문·검색용 HMAC·마스킹 값을 만든다. |
 | [PaymentMapper](../core/src/main/java/io/github/kkw855/settlement/core/payment/PaymentMapper.java) | [PaymentMapper.xml](../core/src/main/resources/mapper/PaymentMapper.xml)의 SQL로 Oracle `payment`를 저장·조회·변경한다. |
 | [ApprovalGateway](../online-api/src/main/java/io/github/kkw855/settlement/online/card/ApprovalGateway.java) | 요청 전문을 조립하고 송수신 로그를 호출하며, 수신 전문을 업무 결과로 해석한다. |
-| [CardMessageLayouts](../online-api/src/main/java/io/github/kkw855/settlement/online/card/CardMessageLayouts.java) | PG 쪽 전문 필드의 위치·길이·타입을 정의한다. |
-| [MessageLogger](../online-api/src/main/java/io/github/kkw855/settlement/online/card/MessageLogger.java) | 카드번호를 가린 전문을 `SEND` 또는 `RECV` 로그로 저장하도록 요청한다. |
+| [CardMessageLayouts](../online-api/src/main/java/io/github/kkw855/settlement/online/card/CardMessageLayouts.java) | PG 쪽 전문 필드의 위치·길이·타입을 정의한다. 응답코드·승인번호의 형식 규칙(`isResponseCode()`, `isApprovalNo()`)도 여기 있다. |
+| [MessageLogger](../online-api/src/main/java/io/github/kkw855/settlement/online/card/MessageLogger.java) | 카드번호를 가린 전문을 `SEND` 또는 `RECV` 로그로 저장하도록 요청한다. 형식이 틀린 응답코드는 `response_code`에 넣지 않는다. |
 | [MessageLogMapper](../core/src/main/java/io/github/kkw855/settlement/core/message/MessageLogMapper.java) | [MessageLogMapper.xml](../core/src/main/resources/mapper/MessageLogMapper.xml)의 SQL로 Oracle `message_log`에 기록한다. |
 | [CardCompanyClient](../online-api/src/main/java/io/github/kkw855/settlement/online/card/CardCompanyClient.java) | 거래마다 소켓을 열고 연결·전송·응답 읽기·종료를 수행한다. |
 | [Framing](../codec/src/main/java/io/github/kkw855/settlement/codec/Framing.java) | TCP 스트림에서 `[ASCII 길이 4바이트][전문 본문]`을 쓰고 읽는다. |
@@ -43,7 +43,7 @@
 7. Gateway가 `CardCompanyClient.send()`를 호출한다. Client는 연결 후 `Framing.write()`로 요청을 보내고, `Framing.read()`로 응답을 기다린다. 사용한 소켓은 닫는다.
 8. 카드사 쪽 `SimulatorServer.serve()`가 요청을 읽고 `CardCompany.handle()`을 호출한다. 0100이면 `approve()`가 승인 여부를 판단하고, 승인 시 `ApprovalLedger.save()`로 기록한다.
 9. `CardCompany`는 `Reply.Respond(응답 본문, 지연 시간)`를 반환한다. 실제 대기와 `Framing.write()`는 `SimulatorServer`가 수행한다. 대기는 `CardCompany.handle()`의 잠금 밖에서 일어난다.
-10. Client가 `Outcome.Received(응답 바이트)`를 반환하면 Gateway의 `interpret()`가 초기 필드를 읽고 `RECV` 로그를 기록한 뒤 전문구분코드·거래고유번호·응답코드를 검증한다. 정상 응답은 `Result.Approved`가 된다.
+10. Client가 `Outcome.Received(응답 바이트)`를 반환하면 Gateway의 `interpret()`가 전문구분코드·응답코드를 읽어 `RECV` 로그를 기록한다. 그다음 전문구분코드·거래고유번호가 요청과 맞는지, 응답코드와 승인번호의 형식이 맞는지 확인한다 ([02-message-spec.md](02-message-spec.md) 1장의 응답 확인). 정상 응답은 `Result.Approved`가 된다.
 11. 서비스가 `PaymentMapper.approve()`로 `REQUESTED → APPROVED`를 반영한다. 승인번호·승인일시·결과코드를 저장하고, 갱신한 결제를 다시 읽어 `ApprovalOutcome.Processed`로 반환한다.
 12. 컨트롤러가 결제를 `PaymentResponse`로 바꿔 201 Created와 `Location: /v1/payments/{txnId}`로 응답한다. 카드번호는 마스킹 값만 나간다.
 
@@ -72,11 +72,11 @@
 |---|---|---|
 | `Received` + 요청과 일치하는 정상 승인 응답 | `Approved` | `APPROVED` / `0000` |
 | `Received` + 요청과 일치하는 거절 응답 | `Declined` | `DECLINED` / 카드사 응답코드 |
-| `Received` + 불일치·필드 해석 실패 | `Unknown` | `UNKNOWN` / `P003` |
+| `Received` + 불일치·필드 해석 실패·응답코드나 승인번호의 형식 오류 | `Unknown` | `UNKNOWN` / `P003` |
 | 연결 실패로 `NotSent` | `NotSent` | `DECLINED` / `P001` |
 | 연결 후 타임아웃·쓰기/읽기 실패 등으로 `Unknown` | `Unknown` | `UNKNOWN` / `P003` |
 
-`Received`만으로 승인을 뜻하지 않는다. 반대로 PG가 타임아웃이어도 카드사는 이미 승인했을 수 있다. 시뮬레이터도 원장에 승인부터 기록하고 지연 응답을 보낸다.
+`Received`만으로 승인을 뜻하지 않는다. 반대로 PG가 타임아웃이어도 카드사는 이미 승인했을 수 있다. 시뮬레이터도 원장에 승인부터 기록하고 지연 응답을 보낸다. 응답코드가 `0000`이어도 승인번호 형식이 틀리면 `Unknown`이다. 카드사에는 승인이 남아 있지만 PG는 그 승인번호를 저장할 수 없으므로 망취소로 되돌릴 대상이다.
 
 결제 행을 만든 뒤에는 결과가 무엇이든 HTTP 201이다. 성공 여부는 본문의 `status`로 판단한다 ([03-api.md](03-api.md) 1장).
 
@@ -109,7 +109,8 @@
 
 - **`SEND`는 전달 성공 증거가 아니다.** 연결 시도보다 먼저 기록하므로 연결 실패에도 남을 수 있다.
 - **`RECV`는 승인 성공 증거가 아니다.** `interpret()`에서 응답코드·전문구분코드를 초기 파싱한 뒤, 요청 일치 여부와 승인 여부를 검증하기 전에 기록한다.
-- 연결 실패·응답 타임아웃에는 `RECV`가 없다. 응답 바이트를 받아도 초기 파싱 전에 실패하면 기록되지 않으며, 로그 기록 이후의 필드 해석에서 실패한 경우에는 `RECV`가 남을 수 있다.
+- 연결 실패·응답 타임아웃에는 `RECV`가 없다. 응답을 받았어도 길이가 150바이트가 아니거나, 전문구분코드가 숫자가 아니거나, 응답코드를 MS949로 읽을 수 없으면 기록하기 전에 실패하므로 `RECV`가 남지 않는다. 그 뒤의 필드(거래고유번호·승인번호·승인일시)에서 실패하면 `RECV`는 남는다.
+- 응답코드가 숫자 4자리가 아니면 `response_code`는 비우고 원문(`masked_payload`)은 그대로 남긴다. `response_code`는 바이트 단위 `CHAR(4)`라 `거절` 같은 값을 넣으면 저장이 실패한다 (ORA-12899). 원문 컬럼은 문자 단위(`VARCHAR2(200 CHAR)`)라 그대로 들어간다.
 - `elapsedMs`는 Gateway가 Client의 `send()` 호출 전후에 측정한 경과 시간이다. 카드사 내부 처리 시간만을 뜻하지 않는다.
 - Logger는 `Arrays.copyOf()`로 새 배열을 만들고, 0100의 카드번호 가운데 6자리를 `*`로 가린다. 실제 전송에 쓰는 원본 배열은 변경하지 않는다.
 

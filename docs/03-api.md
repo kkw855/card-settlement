@@ -42,7 +42,7 @@
 | `2001` | 원거래 없음 | — | `FAILED` |
 | `2002` | 이미 취소됨 | — | `CANCELLED` (카드사 쪽 상태에 맞춘다) |
 | `P001` | 카드사 연결 실패 (전송 안 됨) | `DECLINED` | `FAILED` |
-| `P002` | 응답 확인 실패 (타임아웃, 전문 오류), 망취소 완료 | `NET_CANCELLED` | `NET_CANCELLED` |
+| `P002` | 응답 확인 실패 (타임아웃, 전문 오류. [02-message-spec.md](02-message-spec.md) 1장), 망취소 완료 | `NET_CANCELLED` | `NET_CANCELLED` |
 | `P003` | 응답 확인 실패, 망취소도 실패 | `UNKNOWN` | `UNKNOWN` |
 
 결과를 재현하려면 코드가 저장돼 있어야 하므로 `payment`와 `payment_cancel`에 `result_code`를 둔다 ([01-erd.md](01-erd.md)). 메시지는 코드 표에서 만든다.
