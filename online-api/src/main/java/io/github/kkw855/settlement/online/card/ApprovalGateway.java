@@ -7,7 +7,6 @@ import io.github.kkw855.settlement.codec.MessageReader;
 import io.github.kkw855.settlement.online.card.CardCompanyClient.Outcome;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
 /**
@@ -32,8 +31,6 @@ public final class ApprovalGateway {
     /** 보냈지만 결과를 확인하지 못했다. 망취소로 정리해야 한다. */
     record Unknown(String reason) implements Result {}
   }
-
-  private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
   private final CardCompanyClient client;
   private final MessageLogger messageLogger;

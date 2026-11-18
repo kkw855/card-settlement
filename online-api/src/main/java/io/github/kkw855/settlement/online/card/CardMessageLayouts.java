@@ -3,6 +3,7 @@ package io.github.kkw855.settlement.online.card;
 import io.github.kkw855.settlement.codec.Field;
 import io.github.kkw855.settlement.codec.Layout;
 
+import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
 /**
@@ -14,6 +15,7 @@ import java.util.regex.Pattern;
 public final class CardMessageLayouts {
 
   public static final int MESSAGE_LENGTH = 150;
+  public static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
   // 공통부 (0 ~ 49)
   public static final Field.N MSG_TYPE = new Field.N("전문구분코드", 0, 4);
