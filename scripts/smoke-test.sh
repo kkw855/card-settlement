@@ -51,7 +51,7 @@ expect "조회: 200, 카드번호는 마스킹" 200 '.status == "APPROVED" and .
 approve "$RUN-2" 10001 0
 expect "끝자리 001: 카드사 거절도 201" 201 '.status == "DECLINED" and .result.code == "1001"'
 approve "$RUN-3" 10009 0
-expect "끝자리 009: 응답 지연 -> UNKNOWN (망취소 구현 전)" 201 '.status == "UNKNOWN" and .result.code == "P003"'
+expect "끝자리 009: 응답 지연 -> 망취소" 201 '.status == "NET_CANCELLED" and .result.code == "P002"'
 approve "$RUN-4" 10000 0 "wrong-key"
 expect "틀린 API 키: 401" 401 '.code == "UNAUTHORIZED"'
 approve "$RUN-5" 10000.5 0
