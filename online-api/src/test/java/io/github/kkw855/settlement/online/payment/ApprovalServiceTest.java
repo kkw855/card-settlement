@@ -1,5 +1,6 @@
 package io.github.kkw855.settlement.online.payment;
 
+import io.github.kkw855.settlement.codec.MessageReader;
 import io.github.kkw855.settlement.core.card.CardNumber;
 import io.github.kkw855.settlement.core.card.CardProtector;
 import io.github.kkw855.settlement.core.merchant.Merchant;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -122,29 +124,43 @@ class ApprovalServiceTest extends IntegrationTest {
 
     assertThat(payment.status()).isEqualTo(PaymentStatus.DECLINED);
     assertThat(payment.resultCode()).isEqualTo("P001");
+    verify(cardCompanyClient).send(any()); // 0100 한 번뿐. 0420을 보내지 않는다
   }
 
   @Test
-  @DisplayName("V4 응답 타임아웃: UNKNOWN(P003). 승인으로 취급하지 않는다 (망취소는 2-7)")
-  void unknownOnTimeout() {
-    when(cardCompanyClient.send(any())).thenReturn(new Outcome.Unknown(new SocketTimeoutException("Read timed out")));
+  @DisplayName("V4 응답 타임아웃: 원거래를 가리키는 0420을 보내고, 무효가 확인되면 NET_CANCELLED(P002)")
+  void netCancelsOnTimeout() {
+    when(cardCompanyClient.send(any()))
+      .thenReturn(new Outcome.Unknown(new SocketTimeoutException("Read timed out")))
+      .thenAnswer(invocation -> netCancelled(invocation.getArgument(0)));
 
     Payment payment = approve("key-1", 10_009, 0).payment();
 
-    assertThat(payment.status()).isEqualTo(PaymentStatus.UNKNOWN);
-    assertThat(payment.resultCode()).isEqualTo("P003");
+    assertThat(payment.status()).isEqualTo(PaymentStatus.NET_CANCELLED);
+    assertThat(payment.resultCode()).isEqualTo("P002");
+
+    ArgumentCaptor<byte[]> sent = ArgumentCaptor.forClass(byte[].class);
+    verify(cardCompanyClient, times(2)).send(sent.capture()); // 0100, 0420. 무효가 확인되면 다시 보내지 않는다
+    MessageReader netCancel = NET_CANCEL_REQUEST.reader(sent.getAllValues().get(1));
+    assertThat(netCancel.getDigits(MSG_TYPE)).isEqualTo("0420");
+    assertThat(netCancel.getText(ORIGINAL_TXN_ID)).isEqualTo(payment.txnId());
+    assertThat(netCancel.getDigits(ORIGINAL_MSG_TYPE)).isEqualTo("0100");
+    assertThat(netCancel.getText(NET_CANCEL_MERCHANT_NO)).isEqualTo(merchant.merchantNo());
+    assertThat(netCancel.getLong(NET_CANCEL_AMOUNT)).isEqualTo(payment.amount());
   }
 
   @Test
-  @DisplayName("V5 응답의 거래고유번호가 다르면 정상 코드여도 승인하지 않는다 (UNKNOWN)")
-  void unknownWhenResponseDoesNotMatch() {
-    when(cardCompanyClient.send(any())).thenAnswer(invocation ->
-      new Outcome.Received(response("P2026100899999999999", "0000", "30000001"))
-    );
+  @DisplayName("V5 응답의 거래고유번호가 다르면 정상 코드여도 승인하지 않고 망취소한다 (NET_CANCELLED)")
+  void netCancelsWhenResponseDoesNotMatch() {
+    when(cardCompanyClient.send(any()))
+      .thenAnswer(invocation ->
+        new Outcome.Received(response("P2026100899999999999", "0000", "30000001"))
+      )
+      .thenAnswer(invocation -> netCancelled(invocation.getArgument(0)));
 
     Payment payment = approve("key-1", 10_000, 0).payment();
 
-    assertThat(payment.status()).isEqualTo(PaymentStatus.UNKNOWN);
+    assertThat(payment.status()).isEqualTo(PaymentStatus.NET_CANCELLED);
   }
 
   @Test
@@ -232,28 +248,65 @@ class ApprovalServiceTest extends IntegrationTest {
 
   @ParameterizedTest(name = "응답코드 {0}")
   @ValueSource(strings = {"거절", ""})
-  @DisplayName("V12 응답코드가 숫자 4자리가 아니면 UNKNOWN. RECV 로그는 남기고 응답코드 칸은 비운다")
-  void unknownWhenResponseCodeIsMalformed(String responseCode) {
+  @DisplayName("V12 응답코드가 숫자 4자리가 아니면 망취소한다 (NET_CANCELLED). 0110 RECV 로그는 남기고 응답코드 칸은 비운다")
+  void netCancelsWhenResponseCodeIsMalformed(String responseCode) {
     respondWith(responseCode, null);
 
     Payment payment = approve("key-1", 10_000, 0).payment();
 
-    assertThat(payment.status()).isEqualTo(PaymentStatus.UNKNOWN);
+    assertThat(payment.status()).isEqualTo(PaymentStatus.NET_CANCELLED);
     assertThat(messageLogMapper.findByTxnId(payment.txnId()))
-      .extracting(MessageLog::direction, MessageLog::responseCode)
-      .containsExactly(tuple("SEND", null), tuple("RECV", null));
+      .extracting(MessageLog::msgType, MessageLog::direction, MessageLog::responseCode)
+      .containsExactly(
+        tuple("0100", "SEND", null), tuple("0110", "RECV", null),
+        tuple("0420", "SEND", null), tuple("0430", "RECV", "0000")
+      );
   }
 
   @ParameterizedTest(name = "승인번호 {0}")
   @ValueSource(strings = {"승인번호", ""})
-  @DisplayName("V13 정상(0000) 응답이어도 승인번호가 영문·숫자 1~8자리가 아니면 승인하지 않는다 (UNKNOWN)")
-  void unknownWhenApprovalNoIsMalformed(String approvalNo) {
+  @DisplayName("V13 정상(0000) 응답이어도 승인번호가 영문·숫자 1~8자리가 아니면 승인하지 않고 망취소한다 (NET_CANCELLED)")
+  void netCancelsWhenApprovalNoIsMalformed(String approvalNo) {
     respondWith("0000", approvalNo);
 
     Payment payment = approve("key-1", 10_000, 0).payment();
 
-    assertThat(payment.status()).isEqualTo(PaymentStatus.UNKNOWN);
+    assertThat(payment.status()).isEqualTo(PaymentStatus.NET_CANCELLED);
     assertThat(payment.approvalNo()).isNull();
+  }
+
+  @Test
+  @DisplayName("V14 망취소도 끝내 확인하지 못하면 UNKNOWN(P003). 0420은 최초 1회 + 재시도 3회, 원거래 번호로 로그가 남는다")
+  void staysUnknownWhenNetCancelFails() {
+    when(cardCompanyClient.send(any())).thenReturn(new Outcome.Unknown(new SocketTimeoutException("Read timed out")));
+
+    Payment payment = approve("key-1", 10_000, 0).payment();
+
+    assertThat(payment.status()).isEqualTo(PaymentStatus.UNKNOWN);
+    assertThat(payment.resultCode()).isEqualTo("P003");
+    assertThat(messageLogMapper.findByTxnId(payment.txnId()))
+      .extracting(MessageLog::msgType)
+      .containsExactly("0100", "0420", "0420", "0420", "0420");
+  }
+
+  @Test
+  @DisplayName("V15 0420을 보낼 때 UNKNOWN은 이미 커밋되어 있다. 망취소 중에 앱이 멈춰도 결과를 모르는 거래로 남는다")
+  void commitsUnknownBeforeNetCancel() {
+    AtomicReference<String> statusDuringNetCancel = new AtomicReference<>();
+
+    when(cardCompanyClient.send(any()))
+      .thenReturn(new Outcome.Unknown(new SocketTimeoutException("Read timed out")))
+      .thenAnswer(invocation -> {
+        byte[] request = invocation.getArgument(0);
+        String txnId = NET_CANCEL_REQUEST.reader(request).getText(ORIGINAL_TXN_ID);
+        statusDuringNetCancel.set(statusFromNewConnection(txnId)); // 커밋 전이면 다른 연결에서 안 보인다
+
+        return new Outcome.Unknown(new SocketTimeoutException("Read timed out"));
+      });
+
+    approve("key-1", 10_009, 0);
+
+    assertThat(statusDuringNetCancel).hasValue("UNKNOWN");
   }
 
   // ---------------------------------------------------------------- 도우미
@@ -268,7 +321,9 @@ class ApprovalServiceTest extends IntegrationTest {
     return merchantMapper.findByMerchantNo(merchantNo).orElseThrow();
   }
 
-  /** 커넥션 풀에서 새 연결을 따로 받아 조회한다. 서비스가 쓰는 연결과 다른 세션이다. */
+  /**
+   * 커넥션 풀에서 새 연결을 따로 받아 조회한다. 서비스가 쓰는 연결과 다른 세션이다.
+   */
   private String statusFromNewConnection(String txnId) throws SQLException {
     try (Connection connection = dataSource.getConnection();
          PreparedStatement statement = connection.prepareStatement("SELECT status FROM payment WHERE txn_id = ?")) {
@@ -285,13 +340,29 @@ class ApprovalServiceTest extends IntegrationTest {
   }
 
   /**
-   * 받은 요청의 거래고유번호를 그대로 돌려주는 0110을 만든다.
+   * 0100에는 받은 거래고유번호를 그대로 돌려주는 0110으로 답한다. 그 뒤에 오는 0420에는 0430 01로 답한다.
    */
   private void respondWith(String responseCode, String approvalNo) {
-    when(cardCompanyClient.send(any())).thenAnswer(invocation ->
-      new Outcome.Received(response(txnIdOf(invocation.getArgument(0)),
-        responseCode, approvalNo))
-    );
+    when(cardCompanyClient.send(any()))
+      .thenAnswer(invocation ->
+        new Outcome.Received(response(txnIdOf(invocation.getArgument(0)), responseCode, approvalNo))
+      )
+      .thenAnswer(invocation -> netCancelled(invocation.getArgument(0)));
+  }
+
+  /**
+   * 0420에 0430 01(원거래를 취소함)로 답한다.
+   */
+  private static Outcome netCancelled(byte[] request) {
+    String originalTxnId = NET_CANCEL_REQUEST.reader(request).getText(ORIGINAL_TXN_ID);
+    return new Outcome.Received(NET_CANCEL_RESPONSE.writer()
+      .set(MSG_TYPE, "0430")
+      .set(TXN_ID, originalTxnId)
+      .set(SENT_AT, "20261008103005")
+      .set(RESPONSE_CODE, "0000")
+      .set(ORIGINAL_TXN_ID, originalTxnId)
+      .set(NET_CANCEL_RESULT, "01")
+      .toBytes());
   }
 
   private static String txnIdOf(byte[] request) {

@@ -13,11 +13,13 @@ import org.testcontainers.oracle.OracleContainer;
  *   <li>{@code @ServiceConnection}이 컨테이너의 JDBC URL·계정을 DataSource에 연결한다.
  *   application.yaml의 값보다 우선한다.
  *   <li>키는 테스트 전용 값이다. 운영 키와 같으면 안 된다.
+ *   <li>망취소 재시도 횟수는 운영과 같은 3회지만 기다리지 않는다. 대기 순서(1·2·4초)는 NetCancellerTest가 본다.
  * </ul>
  */
 @SpringBootTest(properties = {
   "crypto.card-encryption-key=Kz8XPJpTi06KBG3iledWAfT9oB+2nQnf+qvkHNqXOX4=",
-  "crypto.card-hmac-key=mSk0cg04hDjDSg6RJ/x7IpZb4yJGCWDZGZRvnqnRXFk="
+  "crypto.card-hmac-key=mSk0cg04hDjDSg6RJ/x7IpZb4yJGCWDZGZRvnqnRXFk=",
+  "card-company.net-cancel-retry-delays=0s,0s,0s"
 })
 public abstract class IntegrationTest {
 

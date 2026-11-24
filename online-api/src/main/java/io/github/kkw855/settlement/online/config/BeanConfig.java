@@ -7,9 +7,7 @@ import io.github.kkw855.settlement.core.crypto.HmacHasher;
 import io.github.kkw855.settlement.core.message.MessageLogMapper;
 import io.github.kkw855.settlement.core.payment.PaymentMapper;
 import io.github.kkw855.settlement.core.payment.TxnIdGenerator;
-import io.github.kkw855.settlement.online.card.ApprovalGateway;
-import io.github.kkw855.settlement.online.card.CardCompanyClient;
-import io.github.kkw855.settlement.online.card.MessageLogger;
+import io.github.kkw855.settlement.online.card.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -61,5 +59,16 @@ class BeanConfig {
   ApprovalGateway approvalGateway(CardCompanyClient cardCompanyClient, MessageLogger messageLogger,
                                   Clock clock) {
     return new ApprovalGateway(cardCompanyClient, messageLogger, clock);
+  }
+
+  @Bean
+  NetCancelGateway netCancelGateway(CardCompanyClient cardCompanyClient, MessageLogger messageLogger,
+                                    Clock clock) {
+    return new NetCancelGateway(cardCompanyClient, messageLogger, clock);
+  }
+
+  @Bean
+  NetCanceller netCanceller(NetCancelGateway netCancelGateway, CardCompanyProperties properties) {
+    return new NetCanceller(netCancelGateway, properties.netCancelRetryDelays(), Thread::sleep);
   }
 }

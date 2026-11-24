@@ -8,11 +8,12 @@ import io.github.kkw855.settlement.core.payment.Payment;
 import io.github.kkw855.settlement.core.payment.PaymentMapper;
 import io.github.kkw855.settlement.core.payment.PaymentStatus;
 import io.github.kkw855.settlement.core.payment.TxnIdGenerator;
-import io.github.kkw855.settlement.online.card.ApprovalGateway;
+import io.github.kkw855.settlement.online.card.*;
 import io.github.kkw855.settlement.online.card.ApprovalGateway.Result;
-import io.github.kkw855.settlement.online.card.ApprovalRequest;
 import io.github.kkw855.settlement.online.error.ApiException;
 import io.github.kkw855.settlement.online.error.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -25,8 +26,10 @@ import java.util.Locale;
  *
  * <pre>
  * 1. REQUESTED 저장 (커밋)     ← 같은 키면 DuplicateKeyException → 기존 결과로 분기
- * 2. 카드사 호출 (트랜잭션 없음)   ← 최대 수 초가 걸린다
- * 3. 결과 반영 (커밋)           ← UPDATE ... WHERE status = 'REQUESTED'
+ * 2. 카드사 호출 (트랜잭션 없음)   ← 최대 4초가 걸린다
+ * 3. 결과 반영 (커밋)           ← UPDATE ... WHERE status = 'REQUESTED'. 결과를 모르면 UNKNOWN
+ * 4. 망취소 (트랜잭션 없음)       ← UNKNOWN일 때만. 최대 23초
+ * 5. 망취소 결과 반영 (커밋)      ← UPDATE ... WHERE status = 'UNKNOWN'
  * </pre>
  *
  * <p><b>이 클래스에 {@code @Transactional}을 붙이지 않는다.</b> 붙이면 카드사를 기다리는 동안 DB 커넥션을 붙잡는다.
@@ -35,20 +38,23 @@ import java.util.Locale;
 @Service
 public class ApprovalService {
 
+  private static final Logger log = LoggerFactory.getLogger(ApprovalService.class);
   private static final long MIN_INSTALLMENT_AMOUNT = 50_000;
 
   private final PaymentMapper paymentMapper;
   private final TxnIdGenerator txnIdGenerator;
   private final CardProtector cardProtector;
   private final ApprovalGateway gateway;
+  private final NetCanceller netCanceller;
   private final Clock clock;
 
   public ApprovalService(PaymentMapper paymentMapper, TxnIdGenerator txnIdGenerator, CardProtector cardProtector,
-                         ApprovalGateway gateway, Clock clock) {
+                         ApprovalGateway gateway, NetCanceller netCanceller, Clock clock) {
     this.paymentMapper = paymentMapper;
     this.txnIdGenerator = txnIdGenerator;
     this.cardProtector = cardProtector;
     this.gateway = gateway;
+    this.netCanceller = netCanceller;
     this.clock = clock;
   }
 
@@ -81,24 +87,50 @@ public class ApprovalService {
     int updated = switch (result) {
       case Result.Approved(String approvalNo, LocalDateTime approvedAt) ->
         paymentMapper.approve(txnId, approvalNo, approvedAt, ResultCodes.APPROVED);
-      case Result.Declined(String responseCode) ->
-        paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
-          PaymentStatus.DECLINED, responseCode);
-      case Result.NotSent() ->
-        paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
-          PaymentStatus.DECLINED, ResultCodes.NOT_SENT);
-      //noinspection unused
-      case Result.Unknown(String reason) -> // 망취소는 2-7에서 붙인다. 지금은 미확정으로 남긴다
-        paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
+      case Result.Declined(String responseCode) -> paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
+        PaymentStatus.DECLINED, responseCode);
+      case Result.NotSent() -> paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
+        PaymentStatus.DECLINED, ResultCodes.NOT_SENT);
+      case Result.Unknown(String reason) -> {
+        log.warn("카드사 응답을 확인하지 못했다: txnId={}, 이유={}", txnId, reason);
+        // 망취소는 최대 23초 걸린다. 그사이 앱이 멈춰도 "결과 모름"이 기록에 남도록 먼저 커밋한다
+        yield paymentMapper.changeStatus(txnId, PaymentStatus.REQUESTED,
           PaymentStatus.UNKNOWN, ResultCodes.UNRESOLVED);
+      }
     };
     if (updated != 1) {
       throw new IllegalStateException("REQUESTED가 아닌 결제의 결과를 기록하려 했다: " + txnId);
     }
+
+    // 4~5. 결과를 모르면 망취소로 정리한다
+    if (result instanceof Result.Unknown) {
+      netCancel(txnId, merchant.merchantNo(), command.amount());
+    }
+
     return new ApprovalOutcome.Processed(paymentMapper.findByTxnId(txnId).orElseThrow());
   }
 
-  /** 같은 키의 결제가 이미 있다. 본문이 같으면 그 결과를, 다르면 거절한다 (docs/03-api.md 3장). */
+  /**
+   * 원거래가 무효로 확인되면 NET_CANCELLED(P002). 끝내 확인하지 못하면 UNKNOWN(P003) 그대로 둔다.
+   */
+  private void netCancel(String txnId, String merchantNo, long amount) {
+    switch (netCanceller.netCancel(new NetCancelRequest(txnId, "0100", merchantNo, amount))) {
+      case NetCancelGateway.Result.Voided() -> {
+        int updated = paymentMapper.changeStatus(txnId, PaymentStatus.UNKNOWN,
+          PaymentStatus.NET_CANCELLED, ResultCodes.NET_CANCELLED);
+        if (updated != 1) {
+          throw new IllegalStateException("UNKNOWN이 아닌 결제를 망취소 완료로 바꾸려 했다: " + txnId);
+        }
+      }
+      case NetCancelGateway.Result.Failed(String reason) ->
+        log.error("망취소를 확인하지 못했다. UNKNOWN으로 남긴다: txnId={}, 이유={}",
+          txnId, reason);
+    }
+  }
+
+  /**
+   * 같은 키의 결제가 이미 있다. 본문이 같으면 그 결과를, 다르면 거절한다 (docs/03-api.md 3장).
+   */
   private ApprovalOutcome replay(Merchant merchant, String idempotencyKey, String cardHash,
                                  ApprovalCommand command, DuplicateKeyException cause) {
     Payment existing = paymentMapper.findByIdempotencyKey(merchant.merchantId(), idempotencyKey)
