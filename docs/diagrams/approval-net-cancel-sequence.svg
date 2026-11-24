@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1850" height="2643" viewBox="0 0 1850 2643" role="img" aria-labelledby="title desc">
+<title id="title">approval-net-cancel-sequence</title>
+<desc id="desc">현재 구현 기준 승인 응답을 확인하지 못한 한 건(끝자리 009)이 망취소로 정리되는 호출 순서. 자세한 설명은 ../05-approval-flow.md 참조.</desc>
+<g font-family="-apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, Malgun Gothic, sans-serif">
+<rect x="0" y="0" width="1850" height="2643" rx="0" fill="#ffffff"/>
+<text x="60" y="76.0" font-size="38" font-weight="700" fill="#172b4d" text-anchor="start">결과를 모르는 승인: 망취소로 어떻게 정리할까?</text>
+<text x="60" y="125.0" font-size="21" font-weight="400" fill="#52647c" text-anchor="start">위에서 아래로 읽으세요 · 끝자리 009: 응답이 늦어 PG가 타임아웃 → UNKNOWN 커밋 → 0420 망취소 → NET_CANCELLED</text>
+<rect x="60" y="154" width="1730" height="57" rx="8" fill="#fff6e8"/>
+<text x="82" y="191.0" font-size="21" font-weight="400" fill="#a95d12" text-anchor="start">가정: 카드사는 승인한 뒤 0110을 5초 늦게 보낸다 · PG의 응답 대기는 3초 · 첫 망취소가 성공한다. 트랜잭션 없이 SQL마다 바로 커밋한다.</text>
+<rect x="50" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="160" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">ApprovalService</text>
+<text x="160" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">업무 흐름</text>
+<path d="M 160.00,334.00 L 160.00,2252.30" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="300" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="410" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">ApprovalGateway</text>
+<text x="410" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">0100 생성·해석</text>
+<path d="M 410.00,334.00 L 410.00,2252.30" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="550" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="660" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">NetCanceller</text>
+<text x="660" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">재시도 · 최대 4번</text>
+<path d="M 660.00,334.00 L 660.00,2252.30" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="805" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="915" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">NetCancelGateway</text>
+<text x="915" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">0420 생성·0430 해석</text>
+<path d="M 915.00,334.00 L 915.00,2252.30" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="1060" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="1170" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">CardCompanyClient</text>
+<text x="1170" y="314.0" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">소켓 송수신</text>
+<path d="M 1170.00,334.00 L 1170.00,2252.30" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="1320" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="1430" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">SimulatorServer</text>
+<text x="1430" y="314.0" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">+ CardCompany</text>
+<path d="M 1430.00,334.00 L 1430.00,2252.30" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="1580" y="245" width="220" height="89" rx="9" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="1690" y="280.0" font-size="19" font-weight="700" fill="#172b4d" text-anchor="middle">Oracle DB</text>
+<text x="1690" y="314.0" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">payment / message_log</text>
+<path d="M 1690.00,334.00 L 1690.00,2252.30" fill="none" stroke="#c0cbd8" stroke-width="1.5" stroke-dasharray="7 6"/>
+<rect x="50.0" y="358.0" width="340" height="71.30" rx="7" fill="#eef4fc"/>
+<text x="220.0" y="384.00" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">시작: approve() 안 · REQUESTED 커밋 뒤</text>
+<text x="220.0" y="408.65" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">정상 승인 그림의 1~7번과 같다</text>
+<path d="M 160.00,490.00 L 410.00,490.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 410.00,490.00 L 399.25,495.33 L 399.25,484.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="166" y="452.0" width="238" height="29.1" rx="3" fill="#ffffff"/>
+<text x="285.0" y="473.0" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">1  approve(request)</text>
+<path d="M 410.00,555.00 L 1690.00,555.00" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,555.00 L 1679.25,560.33 L 1679.25,549.67 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="416" y="517.0" width="1268" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1050.0" y="538.0" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">2  MessageLogger.sent(0100) → SEND 로그 커밋</text>
+<path d="M 410.00,620.00 L 1170.00,620.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 1170.00,620.00 L 1159.25,625.33 L 1159.25,614.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="416" y="582.0" width="748" height="29.1" rx="3" fill="#ffffff"/>
+<text x="790.0" y="603.0" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">3  send(0100) → Socket.connect()</text>
+<path d="M 1170.00,685.00 L 1430.00,685.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 1430.00,685.00 L 1419.25,690.33 L 1419.25,679.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="1176" y="647.0" width="248" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1300.0" y="668.0" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">4  Framing.write(0100)</text>
+<rect x="1270.0" y="703.0" width="320" height="71.30" rx="7" fill="#f5effb"/>
+<text x="1430.0" y="729.00" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">5  승인 · 메모리 원장 저장</text>
+<text x="1430.0" y="753.65" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">0110은 5초 뒤에 보낸다 (잠금 밖)</text>
+<rect x="1000.0" y="790.3" width="340" height="71.30" rx="7" fill="#eef4fc"/>
+<text x="1170.0" y="816.30" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">6  3초 안에 응답 없음</text>
+<text x="1170.0" y="840.95" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">SocketTimeoutException → 소켓 닫기</text>
+<path d="M 1170.00,922.30 L 410.00,922.30" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 410.00,922.30 L 420.75,916.97 L 420.75,927.63 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="416" y="884.3" width="748" height="29.1" rx="3" fill="#ffffff"/>
+<text x="790.0" y="905.3" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">7  Outcome.Unknown · RECV 로그 없음</text>
+<path d="M 410.00,987.30 L 160.00,987.30" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 160.00,987.30 L 170.75,981.97 L 170.75,992.63 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="166" y="949.3" width="238" height="29.1" rx="3" fill="#ffffff"/>
+<text x="285.0" y="970.3" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">8  Result.Unknown</text>
+<path d="M 160.00,1052.30 L 1690.00,1052.30" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,1052.30 L 1679.25,1057.63 L 1679.25,1046.97 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="166" y="1014.3" width="1518" height="29.1" rx="3" fill="#ffffff"/>
+<text x="925.0" y="1035.3" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">9  changeStatus(REQUESTED → UNKNOWN, P003) → 커밋</text>
+<rect x="1470.0" y="1070.3" width="320" height="71.30" rx="7" fill="#edf8f8"/>
+<text x="1630.0" y="1096.30" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">망취소 전에 먼저 커밋</text>
+<text x="1630.0" y="1120.95" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">같은 키로 오면 UNKNOWN 재현</text>
+<path d="M 160.00,1202.30 L 660.00,1202.30" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 660.00,1202.30 L 649.25,1207.63 L 649.25,1196.97 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="166" y="1164.3" width="488" height="29.1" rx="3" fill="#ffffff"/>
+<text x="410.0" y="1185.3" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">10  netCancel(txnId, "0100", 가맹점번호, 금액)</text>
+<path d="M 660.00,1267.30 L 915.00,1267.30" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 915.00,1267.30 L 904.25,1272.63 L 904.25,1261.97 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="666" y="1229.3" width="243" height="29.1" rx="3" fill="#ffffff"/>
+<text x="787.5" y="1250.3" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">11  netCancel(request)</text>
+<rect x="765.0" y="1285.3" width="300" height="71.30" rx="7" fill="#eef4fc"/>
+<text x="915.0" y="1311.30" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">12  0420 생성</text>
+<text x="915.0" y="1335.95" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">거래번호 = 원거래 txnId</text>
+<path d="M 915.00,1417.30 L 1690.00,1417.30" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,1417.30 L 1679.25,1422.63 L 1679.25,1411.97 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="921" y="1379.3" width="763" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1302.5" y="1400.3" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">13  MessageLogger.sent(0420) → SEND 로그 커밋</text>
+<path d="M 915.00,1482.30 L 1170.00,1482.30" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 1170.00,1482.30 L 1159.25,1487.63 L 1159.25,1476.97 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="921" y="1444.3" width="243" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1042.5" y="1465.3" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">14  send(0420) · 새 연결</text>
+<path d="M 1170.00,1547.30 L 1430.00,1547.30" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 1430.00,1547.30 L 1419.25,1552.63 L 1419.25,1541.97 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="1176" y="1509.3" width="248" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1300.0" y="1530.3" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">15  Framing.write(0420)</text>
+<rect x="1260.0" y="1565.3" width="340" height="71.30" rx="7" fill="#f5effb"/>
+<text x="1430.0" y="1591.30" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">16  원장의 승인을 무효로</text>
+<text x="1430.0" y="1615.95" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">0430 · 0000 · 처리구분 01 · 지연 없음</text>
+<path d="M 1430.00,1697.30 L 1170.00,1697.30" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 1170.00,1697.30 L 1180.75,1691.97 L 1180.75,1702.63 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="1176" y="1659.3" width="248" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1300.0" y="1680.3" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">17  Framing.write(0430)</text>
+<path d="M 1170.00,1762.30 L 915.00,1762.30" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 915.00,1762.30 L 925.75,1756.97 L 925.75,1767.63 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="921" y="1724.3" width="243" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1042.5" y="1745.3" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">18  Outcome.Received</text>
+<path d="M 915.00,1827.30 L 1690.00,1827.30" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,1827.30 L 1679.25,1832.63 L 1679.25,1821.97 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="921" y="1789.3" width="763" height="29.1" rx="3" fill="#ffffff"/>
+<text x="1302.5" y="1810.3" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">19  MessageLogger.received(0430) → RECV 로그 커밋</text>
+<rect x="740.0" y="1845.3" width="350" height="71.30" rx="7" fill="#eef4fc"/>
+<text x="915.0" y="1871.30" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">20  전문구분 0430 · 거래번호 · 원거래번호</text>
+<text x="915.0" y="1895.95" font-size="17" font-weight="400" fill="#2563b0" text-anchor="middle">응답코드 0000 · 처리구분 01/02 확인</text>
+<path d="M 915.00,1977.30 L 660.00,1977.30" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 660.00,1977.30 L 670.75,1971.97 L 670.75,1982.63 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="666" y="1939.3" width="243" height="29.1" rx="3" fill="#ffffff"/>
+<text x="787.5" y="1960.3" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">21  Voided</text>
+<path d="M 660.00,2042.30 L 160.00,2042.30" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 160.00,2042.30 L 170.75,2036.97 L 170.75,2047.63 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="166" y="2004.3" width="488" height="29.1" rx="3" fill="#ffffff"/>
+<text x="410.0" y="2025.3" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">22  Voided · 다시 보내지 않음</text>
+<path d="M 160.00,2107.30 L 1690.00,2107.30" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,2107.30 L 1679.25,2112.63 L 1679.25,2101.97 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="166" y="2069.3" width="1518" height="29.1" rx="3" fill="#ffffff"/>
+<text x="925.0" y="2090.3" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">23  changeStatus(UNKNOWN → NET_CANCELLED, P002) → 커밋</text>
+<path d="M 160.00,2172.30 L 1690.00,2172.30" fill="none" stroke="#087f8c" stroke-width="2.4"/>
+<path d="M 1690.00,2172.30 L 1679.25,2177.63 L 1679.25,2166.97 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
+<rect x="166" y="2134.3" width="1518" height="29.1" rx="3" fill="#ffffff"/>
+<text x="925.0" y="2155.3" font-size="18" font-weight="400" fill="#087f8c" text-anchor="middle">24  findByTxnId() → 최종 Payment 조회</text>
+<path d="M 1690.00,2237.30 L 160.00,2237.30" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 160.00,2237.30 L 170.75,2231.97 L 170.75,2242.63 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="166" y="2199.3" width="1518" height="29.1" rx="3" fill="#ffffff"/>
+<text x="925.0" y="2220.3" font-size="18" font-weight="400" fill="#7851a9" text-anchor="middle">Payment 조회 결과 반환</text>
+<rect x="50.0" y="2255.3" width="460" height="71.30" rx="7" fill="#eef4fc"/>
+<text x="280.0" y="2281.30" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">25  201 Created · NET_CANCELLED / P002</text>
+<text x="280.0" y="2305.95" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">PaymentController → 가맹점 (실패로 처리)</text>
+<rect x="50" y="2366" width="1750" height="224" rx="12" fill="#f5f8fc" stroke="#cfdae6"/>
+<text x="76" y="2406.5" font-size="24" font-weight="700" fill="#172b4d" text-anchor="start">망취소가 실패하면 · 실제로 걸린 시간</text>
+<text x="76" y="2450.5" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• Failed(연결 실패 · 응답 없음 · 불일치 · 0000 아님 · 처리구분 오류)면 NetCanceller가 1초 → 2초 → 4초 뒤 같은 0420을 다시 보낸다 (최대 4번)</text>
+<text x="76" y="2488.5" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 4번 모두 Failed면 오류 로그를 남기고 UNKNOWN(P003)으로 둔다. 가맹점은 실패로 처리하고 조회 API로 최종 결과를 확인한다</text>
+<text x="76" y="2526.5" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 로컬 실측(2026-11-24): 009는 3.0초 · 119(망취소에 무응답)는 22.1초 = 3 + 4 × 3 + (1 + 2 + 4). 최악 27초는 연결 1초 × 5번을 더한 값</text>
+<text x="76" y="2564.5" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 109는 PG에서 009와 똑같이 NET_CANCELLED다. 카드사가 실제로는 취소하지 않은 것은 다음 날 대사(STATUS_MISMATCH)에서 드러난다</text>
+</g></svg>

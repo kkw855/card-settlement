@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2021" viewBox="0 0 1600 2021" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2377" viewBox="0 0 1600 2377" role="img" aria-labelledby="title desc">
 <title id="title">approval-class-flow</title>
-<desc id="desc">현재 구현 기준 카드 승인 처리의 클래스 책임과 호출 흐름. 자세한 설명은 ../05-approval-flow.md 참조.</desc>
+<desc id="desc">현재 구현 기준 카드 승인과 망취소 처리의 클래스 책임과 호출 흐름. 자세한 설명은 ../05-approval-flow.md 참조.</desc>
 <g font-family="-apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, Malgun Gothic, sans-serif">
-<rect x="0" y="0" width="1600" height="2021" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="1600" height="2377" rx="0" fill="#ffffff"/>
 <text x="60" y="76.0" font-size="38" font-weight="700" fill="#172b4d" text-anchor="start">카드 승인: 어떤 클래스가 무엇을 담당할까?</text>
-<text x="60" y="123.0" font-size="21" font-weight="400" fill="#52647c" text-anchor="start">현재 구현 기준 · 승인 요청 0100 / 승인 응답 0110 · 선은 호출·데이터 전달 관계</text>
+<text x="60" y="123.0" font-size="21" font-weight="400" fill="#52647c" text-anchor="start">현재 구현 기준 · 승인 0100 / 0110 · 결과를 모르면 망취소 0420 / 0430 · 선은 호출·데이터 전달 관계</text>
 <rect x="590" y="154" width="410" height="52" rx="26" fill="#ffffff" stroke="#52647c" stroke-width="1.5"/>
 <text x="795" y="187.0" font-size="20" font-weight="700" fill="#172b4d" text-anchor="middle">가맹점 · HTTP 요청</text>
 <path d="M 795.00,206.00 L 795.00,282.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
@@ -50,7 +50,7 @@
 <text x="82" y="669" font-size="26" font-weight="700" fill="#172b4d" text-anchor="start">ApprovalService</text>
 <text x="82" y="707" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">approve() / replay()</text>
 <text x="82" y="736" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">멱등 키 판단 · REQUESTED 저장</text>
-<text x="82" y="765" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">결과에 따라 결제 상태 갱신</text>
+<text x="82" y="765" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">결과 반영 · 모르면 망취소 요청</text>
 <rect x="590" y="596" width="410" height="226" rx="14" fill="#f2f6fc" stroke="#cfdae6"/>
 <rect x="590" y="612" width="5" height="194" rx="2" fill="#2563b0"/>
 <text x="612" y="628" font-size="15" font-weight="700" fill="#2563b0" text-anchor="start">ONLINE-API · 전문과 업무 결과 연결</text>
@@ -156,12 +156,12 @@
 <path d="M 1397.00,1252.00 L 1397.00,1103.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
 <path d="M 1397.00,1103.00 L 1402.33,1113.75 L 1391.67,1113.75 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
 <rect x="1149" y="1135" width="372" height="27.65" rx="3" fill="#ffffff"/>
-<text x="1335.0" y="1155" font-size="17" font-weight="400" fill="#52647c" text-anchor="middle">TCP: 0100 ↓   /   0110 ↑</text>
+<text x="1335.0" y="1155" font-size="17" font-weight="400" fill="#52647c" text-anchor="middle">TCP: 0100·0420 ↓   /   0110·0430 ↑</text>
 <rect x="1130" y="1440" width="410" height="137" rx="14" fill="#ffffff" stroke="#cfdae6"/>
 <rect x="1130" y="1456" width="5" height="105" rx="2" fill="#7851a9"/>
 <text x="1152" y="1472" font-size="15" font-weight="700" fill="#7851a9" text-anchor="start">카드사 업무 판단</text>
 <text x="1152" y="1512" font-size="25" font-weight="700" fill="#172b4d" text-anchor="start">CardCompany</text>
-<text x="1152" y="1551" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">handle() → approve() → 0110 생성</text>
+<text x="1152" y="1551" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">handle() → approve() / netCancel()</text>
 <path d="M 1335.00,1395.00 L 1335.00,1440.00" fill="none" stroke="#7851a9" stroke-width="2.4"/>
 <path d="M 1335.00,1440.00 L 1329.67,1429.25 L 1340.33,1429.25 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
 <rect x="1130" y="1617" width="410" height="99" rx="14" fill="#ffffff" stroke="#cfdae6"/>
@@ -184,11 +184,51 @@
 <path d="M 795.00,1558.00 L 789.67,1547.25 L 800.33,1547.25 Z" fill="#087f8c" stroke="none" stroke-width="0"/>
 <rect x="647" y="1478" width="296" height="27.65" rx="3" fill="#ffffff"/>
 <text x="795.0" y="1498" font-size="17" font-weight="400" fill="#087f8c" text-anchor="middle">전문 로그 INSERT</text>
-<path d="M 60.00,1777.00 L 1540.00,1777.00" fill="none" stroke="#cfdae6" stroke-width="2"/>
-<text x="60" y="1820" font-size="20" font-weight="700" fill="#172b4d" text-anchor="start">읽는 법</text>
-<text x="192" y="1820" font-size="20" font-weight="400" fill="#52647c" text-anchor="start">파란 화살표: 처리·전송   /   보라 점선: 반환·응답   /   청록 화살표: DB 저장·조회</text>
-<text x="60" y="1865.0" font-size="21" font-weight="700" fill="#172b4d" text-anchor="start">핵심: Interceptor가 가맹점을 정하고, Controller는 HTTP 요청·응답만 다룹니다.</text>
-<text x="60" y="1901.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">결제 상태는 Service가, 전문 해석·로그 호출은 Gateway가, 실제 송수신은 Client가 맡습니다.</text>
-<rect x="60" y="1929" width="1480" height="52" rx="8" fill="#fff6e8"/>
-<text x="80" y="1961.0" font-size="20" font-weight="400" fill="#a95d12" text-anchor="start">아직 없는 것: 망취소(0420). 응답을 확인하지 못하면 지금은 UNKNOWN(P003)으로 저장하고 끝납니다.</text>
+<rect x="40" y="1766" width="1520" height="330" rx="16" fill="#f7fafd" stroke="#c9d6e6"/>
+<text x="60" y="1804" font-size="21" font-weight="700" fill="#172b4d" text-anchor="start">결과를 모를 때만: ApprovalService가 UNKNOWN을 먼저 커밋한 뒤 망취소를 요청합니다</text>
+<rect x="60" y="1828" width="390" height="200" rx="14" fill="#f2f6fc" stroke="#cfdae6"/>
+<rect x="60" y="1844" width="5" height="168" rx="2" fill="#2563b0"/>
+<text x="82" y="1860" font-size="15" font-weight="700" fill="#2563b0" text-anchor="start">ONLINE-API · 재시도</text>
+<text x="82" y="1901" font-size="26" font-weight="700" fill="#172b4d" text-anchor="start">NetCanceller</text>
+<text x="82" y="1939" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">netCancel()</text>
+<text x="82" y="1968" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">최초 1회 + 재시도 3회</text>
+<text x="82" y="1997" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">대기 1초 → 2초 → 4초</text>
+<rect x="590" y="1828" width="410" height="200" rx="14" fill="#f2f6fc" stroke="#cfdae6"/>
+<rect x="590" y="1844" width="5" height="168" rx="2" fill="#2563b0"/>
+<text x="612" y="1860" font-size="15" font-weight="700" fill="#2563b0" text-anchor="start">ONLINE-API · 전문과 업무 결과 연결</text>
+<text x="612" y="1901" font-size="26" font-weight="700" fill="#172b4d" text-anchor="start">NetCancelGateway</text>
+<text x="612" y="1939" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">netCancel() / interpret()</text>
+<text x="612" y="1968" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">0420 생성 · 송수신 로그 호출</text>
+<text x="612" y="1997" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">0430 검증 → Voided / Failed</text>
+<rect x="1130" y="1828" width="410" height="200" rx="14" fill="#f2f6fc" stroke="#cfdae6"/>
+<rect x="1130" y="1844" width="5" height="168" rx="2" fill="#2563b0"/>
+<text x="1152" y="1860" font-size="15" font-weight="700" fill="#2563b0" text-anchor="start">ONLINE-API · 승인과 같은 객체</text>
+<text x="1152" y="1897" font-size="22" font-weight="700" fill="#172b4d" text-anchor="start">MessageLogger</text>
+<text x="1152" y="1927" font-size="22" font-weight="700" fill="#172b4d" text-anchor="start">CardCompanyClient</text>
+<text x="1152" y="1965" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">0420 SEND · 0430 RECV 로그</text>
+<text x="1152" y="1994" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">로그 txn_id는 원거래 번호</text>
+<path d="M 450.00,1906.00 L 590.00,1906.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 590.00,1906.00 L 579.25,1911.33 L 579.25,1900.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="457" y="1867" width="126" height="27.65" rx="3" fill="#ffffff"/>
+<text x="520.0" y="1887" font-size="17" font-weight="400" fill="#52647c" text-anchor="middle">최대 4번</text>
+<path d="M 590.00,1985.00 L 450.00,1985.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 450.00,1985.00 L 460.75,1979.67 L 460.75,1990.33 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="457" y="1997" width="126" height="27.65" rx="3" fill="#ffffff"/>
+<text x="520.0" y="2017" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">Voided/Failed</text>
+<path d="M 1000.00,1906.00 L 1130.00,1906.00" fill="none" stroke="#2563b0" stroke-width="2.4"/>
+<path d="M 1130.00,1906.00 L 1119.25,1911.33 L 1119.25,1900.67 Z" fill="#2563b0" stroke="none" stroke-width="0"/>
+<rect x="1007" y="1867" width="116" height="27.65" rx="3" fill="#ffffff"/>
+<text x="1065.0" y="1887" font-size="17" font-weight="400" fill="#52647c" text-anchor="middle">send(0420)</text>
+<path d="M 1130.00,1985.00 L 1000.00,1985.00" fill="none" stroke="#7851a9" stroke-width="2.4" stroke-dasharray="7 6"/>
+<path d="M 1000.00,1985.00 L 1010.75,1979.67 L 1010.75,1990.33 Z" fill="#7851a9" stroke="none" stroke-width="0"/>
+<rect x="1007" y="1997" width="116" height="27.65" rx="3" fill="#ffffff"/>
+<text x="1065.0" y="2017" font-size="17" font-weight="400" fill="#7851a9" text-anchor="middle">Outcome</text>
+<text x="60" y="2068" font-size="19" font-weight="400" fill="#52647c" text-anchor="start">Voided → NET_CANCELLED(P002)로 갱신   /   4번 모두 Failed → UNKNOWN(P003) 그대로 두고 오류 로그</text>
+<path d="M 60.00,2133.00 L 1540.00,2133.00" fill="none" stroke="#cfdae6" stroke-width="2"/>
+<text x="60" y="2176" font-size="20" font-weight="700" fill="#172b4d" text-anchor="start">읽는 법</text>
+<text x="192" y="2176" font-size="20" font-weight="400" fill="#52647c" text-anchor="start">파란 화살표: 처리·전송   /   보라 점선: 반환·응답   /   청록 화살표: DB 저장·조회</text>
+<text x="60" y="2221.0" font-size="21" font-weight="700" fill="#172b4d" text-anchor="start">핵심: Interceptor가 가맹점을 정하고, Controller는 HTTP 요청·응답만 다룹니다.</text>
+<text x="60" y="2257.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">결제 상태는 Service가, 전문 해석·로그 호출은 두 Gateway가, 재시도는 NetCanceller가, 실제 송수신은 Client가 맡습니다.</text>
+<rect x="60" y="2285" width="1480" height="52" rx="8" fill="#fff6e8"/>
+<text x="80" y="2317.0" font-size="20" font-weight="400" fill="#a95d12" text-anchor="start">아직 없는 것: 취소 API(0400)와 취소를 되돌리는 망취소(원전문 0400). 시뮬레이터는 둘 다 지원합니다.</text>
 </g></svg>

@@ -64,18 +64,46 @@ scripts/smoke-test.sh
 | 2 | 멱등 재현 | 1과 같은 키·같은 본문 | 201, 1과 같은 `txnId`·상태, `Idempotent-Replayed: true` |
 | 3 | 조회 | `GET /v1/payments/{txnId}` | 200, `cardMasked` = `411111******1111` |
 | 4 | 카드사 거절 | 10,001원 (끝자리 001) | 201 `DECLINED` / `1001` |
-| 5 | 카드사 응답 지연 | 10,009원 (끝자리 009) | 201 `UNKNOWN` / `P003` |
+| 5 | 카드사 응답 지연 → 망취소 | 10,009원 (끝자리 009) | 201 `NET_CANCELLED` / `P002` |
 | 6 | 인증 실패 | 틀린 API 키 | 401 `UNAUTHORIZED` |
 | 7 | 소수 금액 | `10000.5` | 400 `VALIDATION_FAILED` |
 | 8 | 할부 제한 | 10,000원, 3개월 | 422 `INSTALLMENT_NOT_ALLOWED` |
 | 9 | 키 재사용 | 1과 같은 키, 20,000원 | 422 `IDEMPOTENCY_KEY_REUSED` |
 
 - 모두 맞으면 `ok` 9줄이 나오고 종료 코드는 0이다. 하나라도 틀리면 `FAIL` 줄에 실제 응답을 찍고 종료 코드 1로 끝난다. 그래서 CI나 다른 스크립트에서도 그대로 쓸 수 있다.
-- 4초쯤 걸린다 (2026-11-16 확인). 그중 3초는 5번에서 PG가 카드사 응답을 기다리는 시간(read timeout)이다. 시뮬레이터는 5초 뒤에야 응답한다.
-- 5번은 망취소를 구현하기 전의 결과다. 망취소를 붙이면 `NET_CANCELLED` / `P002`가 맞다 ([03-api.md](03-api.md) 2장). 그때 스크립트의 기대값도 바꾼다.
+- 3~4초 걸린다 (2026-11-24 확인: 3.4초). 그중 3초는 5번에서 PG가 카드사 응답을 기다리는 시간(read timeout)이다. 시뮬레이터는 5초 뒤에야 응답한다. 이어서 보내는 망취소(0420)에는 바로 답(0430)이 온다.
+- 5번은 결과를 모르는 거래를 망취소로 정리한 결과다. PG는 `UNKNOWN`을 먼저 저장하고 0420을 보낸다. 시뮬레이터가 원장의 승인을 무효로 만들고 0430으로 답하면 `NET_CANCELLED`로 바꾼다 ([05-approval-flow.md](05-approval-flow.md)).
+- 5번이 `UNKNOWN` / `P003`으로 FAIL이고 20초 넘게 걸렸다면 망취소가 4번 모두 실패한 것이다. 승인 API 로그의 `망취소 실패` 줄에 이유가 남는다.
 - 멱등 키는 DB에 영구 보관되므로 실행마다 `uuidgen`으로 새 키를 만든다. 결제는 실행마다 3건(1·4·5번)씩 쌓인다.
 - 다른 주소로 띄웠으면 `BASE_URL=http://localhost:18080 scripts/smoke-test.sh`처럼 넘긴다.
 - 금액 끝자리 규칙은 [02-message-spec.md](02-message-spec.md) 4장에 있다.
+
+### 망취소가 끝까지 실패하는 경우 (끝자리 119)
+
+스크립트에는 넣지 않았다. 22초가 걸리고, 재시도 횟수와 대기 시간은 단위 테스트([NetCancellerTest](../online-api/src/test/java/io/github/kkw855/settlement/online/card/NetCancellerTest.java) R3, [ApprovalServiceTest](../online-api/src/test/java/io/github/kkw855/settlement/online/payment/ApprovalServiceTest.java) V14)가 이미 확인한다. 직접 보려면 3장대로 띄운 상태에서 프로젝트 루트에서 실행한다.
+
+```bash
+time (curl -sS -X POST http://localhost:8080/v1/payments \
+  -H "X-Api-Key: $(sed -n 's/^LOCAL_MERCHANT_API_KEY=//p' .env)" \
+  -H "Idempotency-Key: $(uuidgen)" -H 'Content-Type: application/json' \
+  -d '{"cardNumber":"4111111111111111","cardExpiry":"2812","installmentMonths":0,"amount":10119}' | jq -c '{txnId, status, result}')
+```
+
+- 22초쯤 뒤 `UNKNOWN` / `P003`이 나온다 (2026-11-24 확인). 0100 응답 대기 3초 + 0420 4번 × 응답 대기 3초 + 재시도 대기 (1 + 2 + 4)초 = 22초다.
+- 승인 API 로그에는 `망취소 실패. 1000ms 뒤 다시 보낸다` WARN이 1000ms·2000ms·4000ms로 3줄, 마지막에 `망취소를 확인하지 못했다. UNKNOWN으로 남긴다` ERROR가 1줄 남는다.
+- `message_log`에는 0100 `SEND` 1행과 0420 `SEND` 4행이 남고 `RECV`는 없다. 가장 최근의 119 결제를 아래처럼 조회한다.
+
+```bash
+docker compose exec -T oracle bash -c 'sqlplus -s "$APP_USER/$APP_USER_PASSWORD@//localhost/FREEPDB1"' <<'SQL'
+SET PAGESIZE 50 FEEDBACK OFF
+COLUMN msg_type FORMAT A8
+SELECT msg_type, direction, response_code, elapsed_ms FROM message_log
+ WHERE txn_id = (SELECT MAX(txn_id) FROM payment WHERE amount = 10119)
+ ORDER BY log_id;
+SQL
+```
+
+끝자리 109는 PG에서 5번과 같은 `NET_CANCELLED` / `P002`다 (3.0초). 시뮬레이터가 실제로는 취소하지 않은 것은 다음 날 대사에서 드러난다 (Phase 3).
 
 ## 5. 통합 테스트와 무엇이 다른가
 
@@ -86,9 +114,9 @@ scripts/smoke-test.sh
 | DB | Testcontainers가 띄운 Oracle | compose Oracle |
 | HTTP | MockMvc (서블릿 컨테이너 없이 호출) | 실제 Tomcat에 curl |
 | 카드사 | `CardCompanyClient`를 Mockito로 대신한다 | 시뮬레이터 프로세스와 실제 TCP |
-| 설정 | 테스트 전용 키 (`IntegrationTest`) | `.env`, `local` 프로필, bootRun 설정 |
+| 설정 | 테스트 전용 키, 망취소 대기 0초 (`IntegrationTest`) | `.env`, `local` 프로필, bootRun 설정 |
 
-PG([CardMessageLayouts](../online-api/src/main/java/io/github/kkw855/settlement/online/card/CardMessageLayouts.java))와 시뮬레이터([MessageLayouts](../simulator/src/main/java/io/github/kkw855/settlement/simulator/MessageLayouts.java))는 전문 정의를 따로 갖는다. 둘이 실제 소켓으로 0100을 보내고 0110을 받는지는 지금은 스모크 테스트에서만 확인한다.
+PG([CardMessageLayouts](../online-api/src/main/java/io/github/kkw855/settlement/online/card/CardMessageLayouts.java))와 시뮬레이터([MessageLayouts](../simulator/src/main/java/io/github/kkw855/settlement/simulator/MessageLayouts.java))는 전문 정의를 따로 갖는다. 둘이 실제 소켓으로 0100·0110과 0420·0430을 주고받는지는 지금은 스모크 테스트에서만 확인한다. 0420·0430은 5번(끝자리 009)이 지나간다.
 
 ## 6. 문제 해결
 

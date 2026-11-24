@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1850" height="2586" viewBox="0 0 1850 2586" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1850" height="2624" viewBox="0 0 1850 2624" role="img" aria-labelledby="title desc">
 <title id="title">approval-sequence</title>
 <desc id="desc">현재 구현 기준 승인 성공 한 건의 호출 순서 (HTTP 요청부터 응답까지). 자세한 설명은 ../05-approval-flow.md 참조.</desc>
 <g font-family="-apple-system, BlinkMacSystemFont, Apple SD Gothic Neo, Malgun Gothic, sans-serif">
-<rect x="0" y="0" width="1850" height="2586" rx="0" fill="#ffffff"/>
+<rect x="0" y="0" width="1850" height="2624" rx="0" fill="#ffffff"/>
 <text x="60" y="76.0" font-size="38" font-weight="700" fill="#172b4d" text-anchor="start">승인 성공 한 건: 호출은 어떤 순서로 이어질까?</text>
 <text x="60" y="125.0" font-size="21" font-weight="400" fill="#52647c" text-anchor="start">위에서 아래로 읽으세요 · Oracle 저장과 카드사 통신의 경계를 함께 표시했습니다.</text>
 <rect x="60" y="154" width="1730" height="57" rx="8" fill="#fff6e8"/>
@@ -138,10 +138,11 @@
 <rect x="50" y="2198" width="420" height="74.2" rx="7" fill="#eef4fc"/>
 <text x="260.0" y="2225.0" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">22  201 Created + Location</text>
 <text x="260.0" y="2251.1" font-size="18" font-weight="400" fill="#2563b0" text-anchor="middle">PaymentResponse(JSON) → 가맹점</text>
-<rect x="50" y="2308" width="1750" height="224" rx="12" fill="#f5f8fc" stroke="#cfdae6"/>
+<rect x="50" y="2308" width="1750" height="262" rx="12" fill="#f5f8fc" stroke="#cfdae6"/>
 <text x="76" y="2349.0" font-size="24" font-weight="700" fill="#172b4d" text-anchor="start">성공 경로 밖에서 달라지는 점</text>
 <text x="76" y="2393.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 검사 순서: 401(API 키) → 400(본문·Idempotency-Key) → 403(정지 가맹점) → 422(할부). 여기서 막히면 저장도 전송도 없음</text>
-<text x="76" y="2431.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 같은 멱등 키: 처리 중이면 409, 본문이 다르면 422, 끝났으면 저장된 결과로 201 재현 → 카드사 재전송 없음</text>
-<text x="76" y="2469.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 연결 실패: DECLINED(P001)   /   타임아웃·확인 불가: UNKNOWN(P003). 둘 다 201이고 성공 여부는 status로 판단 · 망취소는 아직 없음</text>
-<text x="76" y="2507.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• SEND는 전송 전에 남김. RECV는 응답 필드 일부를 읽은 뒤, 전문구분·거래번호 검증 전에 남김.</text>
+<text x="76" y="2431.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 같은 멱등 키: REQUESTED면 409, 본문이 다르면 422, 그 밖에는 저장된 결과로 201 재현(망취소 중이면 UNKNOWN) → 카드사 재전송 없음</text>
+<text x="76" y="2469.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 연결 실패: DECLINED(P001). 카드사에 닿지 않았으므로 망취소도 없음. 결과와 상관없이 201이고 성공 여부는 status로 판단</text>
+<text x="76" y="2507.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• 타임아웃·확인 불가: UNKNOWN(P003)을 먼저 커밋 → 0420 망취소 → NET_CANCELLED(P002). 망취소도 실패하면 UNKNOWN 그대로 · 순서는 망취소 그림</text>
+<text x="76" y="2545.0" font-size="20" font-weight="400" fill="#172b4d" text-anchor="start">• SEND는 전송 전에 남김. RECV는 응답 필드 일부를 읽은 뒤, 전문구분·거래번호 검증 전에 남김.</text>
 </g></svg>
