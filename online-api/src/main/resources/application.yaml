@@ -22,6 +22,7 @@ card-company:
   port: ${CARD_COMPANY_PORT:8583}
   connect-timeout: 1s
   read-timeout: 3s
+  net-cancel-retry-delays: [1s, 2s, 4s] # 망취소 재시도 전 대기. 개수가 재시도 횟수다 (최초 1회 + 3회)
 
 crypto:
   card-encryption-key: ${CARD_ENCRYPTION_KEY:}

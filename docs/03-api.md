@@ -66,6 +66,7 @@ INSERT payment (status = REQUESTED, merchant_id, idempotency_key, ...) → 커�
 - Oracle에서 첫 번째 세션이 커밋하기 전에 두 번째 세션이 같은 키를 INSERT하면, 두 번째 세션은 **기다린다.** 첫 번째가 커밋하면 ORA-00001, 롤백하면 INSERT가 성공한다. 첫 트랜잭션은 INSERT 하나라 금방 끝난다.
 - **본문 비교용 컬럼을 따로 두지 않는다.** 저장된 `card_hash`(HMAC), `amount`, `installment_months`와 비교한다. 유효기간은 저장하지 않으므로 비교에서 빠진다.
 - **거절된 결제를 같은 키로 다시 보내면 거절이 재현된다.** 다시 결제하려면 새 키를 써야 한다. 가맹점 연동 안내에 꼭 적어야 하는 규칙이다.
+- **망취소가 끝나기 전에 같은 키로 오면 `UNKNOWN`/`P003`이 재현된다.** 망취소를 보내기 전에 `UNKNOWN`을 먼저 저장하기 때문이다 (4장). 최종 결과(`NET_CANCELLED`/`P002`)와 코드는 다를 수 있지만 가맹점이 할 일은 같다. `APPROVED`가 아니므로 실패로 처리한다. 최종 결과는 조회 API로 확인한다.
 - 키는 v1에서 영구 보관한다 (UNIQUE). 보관 기간을 두고 지우는 건 완성선 이후.
 - 400(키 없음), 409(처리 중), 422(본문이 다름) 구분은 IETF 초안 *The Idempotency-Key HTTP Header Field*의 오류 처리 규칙을 따랐다.
 
@@ -82,13 +83,15 @@ INSERT payment (status = REQUESTED, merchant_id, idempotency_key, ...) → 커�
 
 가맹점 클라이언트의 읽기 타임아웃은 **30초 이상**으로 안내한다. 그래도 끊기면 같은 키로 재시도한다.
 
-**카드사를 호출하는 동안 DB 트랜잭션을 잡지 않는다.** 트랜잭션을 둘로 나눈다.
+**카드사를 호출하는 동안 DB 트랜잭션을 잡지 않는다.** 저장은 SQL 한 문장씩 바로 커밋하고, 카드사 호출은 그 사이에 트랜잭션 없이 한다.
 
 1. `INSERT … REQUESTED` → 커밋
 2. 카드사 호출 (트랜잭션 없음)
-3. `UPDATE payment SET status = … WHERE payment_id = ? AND status = 'REQUESTED'` → 커밋 (I3)
+3. `UPDATE payment SET status = … WHERE txn_id = ? AND status = 'REQUESTED'` → 커밋 (I3). 결과를 모르면 `UNKNOWN`
+4. `UNKNOWN`일 때만: 망취소 (트랜잭션 없음, 재시도까지 최대 23초)
+5. 원거래가 무효로 확인되면 `UPDATE … SET status = 'NET_CANCELLED' WHERE txn_id = ? AND status = 'UNKNOWN'` → 커밋. 끝내 확인하지 못하면 `UNKNOWN` 그대로
 
-하나로 묶으면 카드사가 느린 동안 DB 커넥션을 붙잡는다. 커넥션 풀이 10개이고 요청마다 27초를 잡으면 처리량은 10 ÷ 27초 ≈ **초당 0.37건**으로 떨어진다 (리틀의 법칙). 평소 피크 116 TPS를 감당할 수 없다. 나누면 커넥션은 INSERT와 UPDATE 순간에만 쓴다. 또 1번을 먼저 커밋하지 않으면, 전송 후 앱이 죽었을 때 "보냈을지도 모르는 거래"가 기록에 남지 않는다 ([00-domain.md](00-domain.md) 4장).
+하나로 묶으면 카드사가 느린 동안 DB 커넥션을 붙잡는다. 커넥션 풀이 10개이고 요청마다 27초를 잡으면 처리량은 10 ÷ 27초 ≈ **초당 0.37건**으로 떨어진다 (리틀의 법칙). 평소 피크 116 TPS를 감당할 수 없다. 나누면 커넥션은 INSERT와 UPDATE 순간에만 쓴다. 또 1번을 먼저 커밋하지 않으면, 전송 후 앱이 죽었을 때 "보냈을지도 모르는 거래"가 기록에 남지 않는다 ([00-domain.md](00-domain.md) 4장). 3번에서 `UNKNOWN`을 먼저 커밋하는 이유도 같다. 망취소 중에 앱이 죽어도 "결과를 모르는 거래"로 남는다.
 
 **HTTP 요청은 가상 스레드로 처리한다** ([ADR-0003](adr/0003-external-messaging.md), `spring.threads.virtual.enabled=true`). 카드사 장애로 모든 요청이 27초씩 걸리면, 동시에 붙잡힌 요청은 116 TPS × 27초 ≈ **3,100개**다. 플랫폼 스레드 풀(Tomcat 기본 200개)이면 바로 고갈된다. 가상 스레드는 블로킹되는 동안 OS 스레드를 놓아준다.
 
